@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import random
+import numpy.random
 import pickle
 
 class Card:
@@ -43,7 +44,7 @@ class Database:
         self.categories[0].add(word)
 
     def update(self, correct, incorrect):
-        if len(correct) == len(self.categories):
+        if len(correct) == len(self.categories) and correct[:-1]:
             self.categories += [set()]
 
         for difficulty, words in enumerate(correct):
@@ -202,7 +203,7 @@ def make_quiz(words, length):
         return []
 
     # number of words from the list `words[0]`
-    words_from_this_category = min(max(length // 2, 1), len(words[0]))
+    words_from_this_category = min(numpy.random.binomial(length, 0.5), len(words[0]))
     # number of words from the lists `words[1:]`
     words_from_other_categories = length - words_from_this_category
 
