@@ -53,7 +53,7 @@ class Database:
 
         for difficulty, words in enumerate(incorrect[1:]):
             self.categories[difficulty + 1] -= words
-            self.categories[difficulty].update(words)
+            self.categories[0].update(words)
 
 
 def main():
