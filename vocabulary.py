@@ -106,7 +106,8 @@ def main_menu(database):
 
             if answer in ['A', 'a']:
                 word = promt_for_card(database.langs)
-                database.add_card(word)
+                if word:
+                    database.add_card(word)
 
             if answer in ['R', 'r']:
                 promt_remove_card(database)
@@ -153,13 +154,18 @@ def promt_for_database():
 
 
 def promt_for_card(langs):
-    words = []
-    for lang in langs:
-        word = input("Enter your word in {}: ".format(lang))
-        words.append(word)
+    try:
+        words = []
+        for lang in langs:
+            word = input("Enter your word in {}: ".format(lang))
+            words.append(word)
 
-    comment = input("Enter comment: ")
-    return Card(words, comment)
+        comment = input("Enter comment: ")
+        return Card(words, comment)
+
+    except KeyboardInterrupt:
+        print()
+        return None
 
 
 def promt_remove_card(database):
@@ -219,26 +225,28 @@ def do_quiz(database, quiz):
         print("{}: {}".format(i, lang))
 
     from_lang = int(input("> "))
-        
+
     correct = [set() for _ in range(len(quiz))]
     incorrect = [set() for _ in range(len(quiz))]
 
-    for difficulty, cards in enumerate(quiz):
-        for question in cards:
-            print(question.words[from_lang])
+    try:
+        for difficulty, cards in enumerate(quiz):
+            for question in cards:
+                print(question.words[from_lang])
 
-            input("Press [enter] to show solution")
-            print(question)
+                input("Press [enter] to show solution")
+                print(question)
 
-            res = input("Did you answer correctly? [y/N] ")
-            if res in ['Y', 'y']:
-                correct[difficulty].add(question)
-            else:
-                incorrect[difficulty].add(question)
+                res = input("Did you answer correctly? [y/N] ")
+                if res in ['Y', 'y']:
+                    correct[difficulty].add(question)
+                else:
+                    incorrect[difficulty].add(question)
 
-    print("{}/{} answered correctly".format(flat_len(correct), flat_len(correct) + flat_len(incorrect)))
+    finally:
+        print("{}/{} answered correctly".format(flat_len(correct), flat_len(correct) + flat_len(incorrect)))
 
-    return (correct, incorrect)
+        return (correct, incorrect)
 
 
 def flat_len(xss):
