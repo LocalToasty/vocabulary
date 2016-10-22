@@ -44,7 +44,7 @@ class Database:
         self.categories[0].add(word)
 
     def update(self, correct, incorrect):
-        if len(correct) == len(self.categories) and correct[:-1]:
+        if len(correct) == len(self.categories):
             self.categories += [set()]
 
         for difficulty, words in enumerate(correct):
@@ -116,10 +116,7 @@ def main_menu(database):
                 take_quiz(database)
 
             elif answer in ['L', 'l']:
-                for difficulty, category in enumerate(database.categories):
-                    print("### Difficulty {} ###".format(difficulty))
-                    for card in category:
-                        print(card)
+                list_cards(database)
 
             elif answer in ['F', 'f']:
                 keyword = input("Enter term to search for: ")
@@ -260,4 +257,19 @@ def print_statistics(database):
     print("total:\t{}\twords".format(len(database)))
 
 
-main()
+def list_cards(database):
+    line = 0
+    for difficulty, category in enumerate(database.categories):
+        print("### Difficulty {} ###".format(difficulty))
+        line += 1
+        for card in category:
+            if line >= 20:
+                input()
+                line = 0
+
+            print(card)
+            line += 1
+
+
+if __name__ == "__main__":
+    main()
