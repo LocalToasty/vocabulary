@@ -25,6 +25,7 @@ class Database:
     def __init__(self, langs):
         self.langs = langs
         self.categories = [set()]
+        self.modified = False
 
     def __len__(self):
         return self.no_of_cards_easier_than(0)
@@ -42,6 +43,7 @@ class Database:
         The word is given a difficulty of 0 (i.e. unknown)."
         """
         self.categories[0].add(word)
+        self.modified = True
 
     def update(self, correct, incorrect):
         if len(correct) == len(self.categories):
@@ -55,6 +57,8 @@ class Database:
             self.categories[difficulty + 1] -= words
             self.categories[0].update(words)
 
+        self.modified = True
+
 
 def main():
     main_menu(None)
@@ -64,6 +68,7 @@ def load_database(path):
     database = None
     with open(path, "rb") as dbfile:
         database = pickle.load(dbfile)
+        database.modified = False
 
     return database
 
@@ -73,71 +78,86 @@ def main_menu(database):
 
     while True:
         if database is None:
-            print("[C]reate new database")
-            print("[L]oad existing database")
-            print("[Q]uit")
+            try:
+                print("[C]reate new database")
+                print("[L]oad existing database")
+                print("[Q]uit")
 
-            answer = input("Select an option: ")
+                answer = input("Select an option: ")
 
-            if answer in ['C', 'c']:
-                database = promt_for_database()
+                if answer in ['C', 'c']:
+                    database = promt_for_database()
 
-            elif answer in ['L', 'l']:
-                path = input("Enter database location: ")
-                database = load_database(path)
-                if database is None:
-                    print("Failed to load database")
+                elif answer in ['L', 'l']:
+                    path = input("Enter database location: ")
+                    database = load_database(path)
+                    if database is None:
+                        print("Failed to load database")
 
-            elif answer in ['Q', 'q']:
-                break
+                elif answer in ['Q', 'q']:
+                    return
+
+            except KeyboardInterrupt:
+                return
 
         else:
-            print("[A]dd new card")
-            print("[R]emove a card")
-            print("Take a qui[z]")
-            print("[L]ist words")
-            print("[F]ind words")
-            print("S[t]atistics")
-            print("[S]ave database")
-            print("[C]lose database")
-            print("[Q]uit")
+            try:
+                print("[A]dd new card")
+                print("[R]emove a card")
+                print("Take a qui[z]")
+                print("[L]ist words")
+                print("[F]ind words")
+                print("S[t]atistics")
+                print("[S]ave database")
+                print("[C]lose database")
+                print("[Q]uit")
 
-            answer = input("Select an option: ")
+                answer = input("Select an option: ")
 
-            if answer in ['A', 'a']:
-                word = promt_for_card(database.langs)
-                if word:
-                    database.add_card(word)
+                if answer in ['A', 'a']:
+                    word = promt_for_card(database.langs)
+                    if word:
+                        database.add_card(word)
 
-            if answer in ['R', 'r']:
-                promt_remove_card(database)
+                if answer in ['R', 'r']:
+                    promt_remove_card(database)
 
-            elif answer in ['Z', 'z']:
-                take_quiz(database)
+                elif answer in ['Z', 'z']:
+                    take_quiz(database)
 
-            elif answer in ['L', 'l']:
-                list_cards(database)
+                elif answer in ['L', 'l']:
+                    list_cards(database)
 
-            elif answer in ['F', 'f']:
-                keyword = input("Enter term to search for: ")
-                for difficulty, category in enumerate(database.categories):
-                    for card in category:
-                        if any(keyword in word for word in card.words) or keyword in card.comment:
-                            print(card)
+                elif answer in ['F', 'f']:
+                    keyword = input("Enter term to search for: ")
+                    for difficulty, category in enumerate(database.categories):
+                        for card in category:
+                            if any(keyword in word for word in card.words) or keyword in card.comment:
+                                print(card)
 
-            elif answer in ['T', 't']:
-                print_statistics(database)
+                elif answer in ['T', 't']:
+                    print_statistics(database)
 
-            elif answer in ['S', 's']:
-                path = input("Save database as: ")
-                with open(path, "wb") as dbfile:
-                    pickle.dump(database, dbfile)
+                elif answer in ['S', 's']:
+                    path = input("Save database as: ")
+                    with open(path, "wb") as dbfile:
+                        pickle.dump(database, dbfile)
 
-            elif answer in ['C', 'c']:
-                database = None
+                elif answer in ['C', 'c']:
+                    database = None
 
-            elif answer in ['Q', 'q']:
-                break
+                elif answer in ['Q', 'q']:
+                    break
+
+            except KeyboardInterrupt:
+                if database.modified:
+                    answer = input("Save changes? [Y/n] ")
+                    if answer not in ['N', 'n']:
+                        path = input("Save database as: ")
+                        with open(path, "wb") as dbfile:
+                            pickle.dump(database, dbfile)
+
+                return
 
 
 def promt_for_database():
