@@ -46,7 +46,7 @@ class Database:
         self.modified = True
 
     def update(self, correct, incorrect):
-        if len(correct) == len(self.categories):
+        if len(correct) == len(self.categories) and correct[-1] != []:
             self.categories += [set()]
 
         for difficulty, words in enumerate(correct):
