@@ -20,6 +20,13 @@ class Card:
 
         return res
 
+    def __hash__(self):
+        res = hash(self.comment)
+        for lang in self.words:
+            res += hash(lang)
+
+        return res
+
 class Database:
     """Contains multiple words."""
     def __init__(self, langs):
@@ -50,8 +57,9 @@ class Database:
             self.categories += [set()]
 
         for difficulty, words in enumerate(correct):
-            self.categories[difficulty] -= words
-            self.categories[difficulty + 1].update(words)
+            if words:
+                self.categories[difficulty] -= words
+                self.categories[difficulty + 1].update(words)
 
         for difficulty, words in enumerate(incorrect[1:]):
             self.categories[difficulty + 1] -= words
@@ -105,7 +113,8 @@ def main_menu(database):
                 print("[A]dd new card")
                 print("[R]emove a card")
                 print("Take a qui[z]")
-                print("[L]ist words")
+                print("[L]earn new words")
+                print("L[i]st words")
                 print("[F]ind words")
                 print("S[t]atistics")
                 print("[S]ave database")
@@ -126,6 +135,9 @@ def main_menu(database):
                     take_quiz(database)
 
                 elif answer in ['L', 'l']:
+                    learn_cards(database)
+
+                elif answer in ['I', 'i']:
                     list_cards(database)
 
                 elif answer in ['F', 'f']:
@@ -234,6 +246,29 @@ def make_quiz(words, length):
     quiz += make_quiz(words[1:], words_from_other_categories)
 
     return quiz
+
+
+def learn_cards(database):
+    length = int(input("How many words should the quiz contain? "))  #TODO
+    quiz = select_cards_to_learn(database.categories, length)
+    correct, incorrect = do_quiz(database, quiz)
+    database.update(correct, incorrect)
+
+
+def select_cards_to_learn(words, length):
+    if not words or length == 0:
+        return []
+
+    words_from_this_category = min(length, len(words[0]))
+    words_from_other_categories = length - words_from_this_category
+
+    quiz = [x for x in words[0]]
+    quiz.sort(key=hash)
+    quiz = [quiz[:words_from_this_category]]
+    quiz += make_quiz(words[1:], words_from_other_categories)
+
+    return quiz
+    
 
 
 def do_quiz(database, quiz):
