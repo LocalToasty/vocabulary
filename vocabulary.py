@@ -259,7 +259,7 @@ def select_cards_to_learn(words, length):
     if not words or length == 0:
         return []
 
-    words_from_this_category = min(length, len(words[0]))
+    words_from_this_category = min(numpy.random.binomial(length, 2/3), len(words[0]))
     words_from_other_categories = length - words_from_this_category
 
     quiz = [x for x in words[0]]
