@@ -3,6 +3,7 @@
 import random
 import numpy.random
 import pickle
+import sys
 
 class Card:
     def __init__(self, words, comment):
@@ -70,7 +71,12 @@ class Database:
 
 
 def main():
-    main_menu(None)
+    if not len(sys.argv):
+        print("Usage: {} <file>".format(sys.argv[0]))
+        return
+
+    db = load_database(sys.argv[1])
+    main_menu(db)
 
 
 def load_database(path):
@@ -87,100 +93,75 @@ def main_menu(database):
     print("Vocabulary training program")
 
     while True:
-        if database is None:
-            try:
-                answer = input("Select an option: ")
+        try:
+            answer = input("Select an option: ")
 
-                if answer in ['C', 'c']:
-                    database = promt_for_database()
+            if answer in ['A', 'a']:
+                word = promt_for_card(database.langs)
+                if word:
+                    database.add_card(word)
 
-                elif answer in ['L', 'l']:
-                    path = input("Enter database location: ")
-                    database = load_database(path)
-                    if database is None:
-                        print("Failed to load database")
+            if answer in ['R', 'r']:
+                promt_remove_card(database)
 
-                elif answer in ['Q', 'q']:
-                    return
+            elif answer in ['Z', 'z']:
+                take_quiz(database)
 
-                else:
-                    print("[C]reate new database")
-                    print("[L]oad existing database")
-                    print("[Q]uit")
+            elif answer in ['L', 'l']:
+                learn_cards(database)
 
-            except KeyboardInterrupt:
-                return
+            elif answer in ['I', 'i']:
+                list_cards(database)
 
-        else:
-            try:
-                answer = input("Select an option: ")
+            elif answer in ['F', 'f']:
+                keyword = input("Enter term to search for: ")
+                for difficulty, category in enumerate(database.categories):
+                    for card in category:
+                        if any(keyword in word for word in card.words) or keyword in card.comment:
+                            print(card)
 
-                if answer in ['A', 'a']:
-                    word = promt_for_card(database.langs)
-                    if word:
-                        database.add_card(word)
+            elif answer in ['T', 't']:
+                print_statistics(database)
 
-                if answer in ['R', 'r']:
-                    promt_remove_card(database)
+            elif answer in ['S', 's']:
+                path = input("Save database as [{}]: "
+                             .format(database.path))
+                if path == "":
+                    path = database.path
+                with open(path, "wb") as dbfile:
+                    pickle.dump(database, dbfile)
+                database.path = path
 
-                elif answer in ['Z', 'z']:
-                    take_quiz(database)
+            elif answer in ['C', 'c']:
+                database = None
 
-                elif answer in ['L', 'l']:
-                    learn_cards(database)
+            elif answer in ['Q', 'q']:
+                break
 
-                elif answer in ['I', 'i']:
-                    list_cards(database)
+            else:
+                print("[A]dd new card")
+                print("[R]emove a card")
+                print("Take a qui[z]")
+                print("[L]earn new words")
+                print("L[i]st words")
+                print("[F]ind words")
+                print("S[t]atistics")
+                print("[S]ave database")
+                print("[C]lose database")
+                print("[Q]uit")
 
-                elif answer in ['F', 'f']:
-                    keyword = input("Enter term to search for: ")
-                    for difficulty, category in enumerate(database.categories):
-                        for card in category:
-                            if any(keyword in word for word in card.words) or keyword in card.comment:
-                                print(card)
-
-                elif answer in ['T', 't']:
-                    print_statistics(database)
-
-                elif answer in ['S', 's']:
+        except KeyboardInterrupt:
+            if database.modified:
+                answer = input("Save changes? [Y/n] ")
+                if answer not in ['N', 'n']:
                     path = input("Save database as [{}]: "
                                  .format(database.path))
                     if path == "":
                         path = database.path
                     with open(path, "wb") as dbfile:
                         pickle.dump(database, dbfile)
-                    database.path = path
 
-                elif answer in ['C', 'c']:
-                    database = None
-
-                elif answer in ['Q', 'q']:
-                    break
-
-                else:
-                    print("[A]dd new card")
-                    print("[R]emove a card")
-                    print("Take a qui[z]")
-                    print("[L]earn new words")
-                    print("L[i]st words")
-                    print("[F]ind words")
-                    print("S[t]atistics")
-                    print("[S]ave database")
-                    print("[C]lose database")
-                    print("[Q]uit")
-
-            except KeyboardInterrupt:
-                if database.modified:
-                    answer = input("Save changes? [Y/n] ")
-                    if answer not in ['N', 'n']:
-                        path = input("Save database as [{}]: "
-                                     .format(database.path))
-                        if path == "":
-                            path = database.path
-                        with open(path, "wb") as dbfile:
-                            pickle.dump(database, dbfile)
-
-                return
+            return
 
 
 def promt_for_database():
