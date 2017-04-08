@@ -16,7 +16,7 @@ class Card:
             res += "\t{}".format(lang)
 
         if self.comment:
-            res += "\t\t# " + self.comment
+            res += "\t# " + self.comment
 
         return res
 
