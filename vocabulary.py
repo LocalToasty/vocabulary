@@ -54,7 +54,7 @@ class Database:
         self.modified = True
 
     def update(self, correct, incorrect):
-        if len(correct) == len(self.categories) and correct[-1] != []:
+        if len(correct) == len(self.categories) and correct[-1]:
             self.categories += [set()]
 
         for difficulty, words in enumerate(correct):
@@ -89,10 +89,6 @@ def main_menu(database):
     while True:
         if database is None:
             try:
-                print("[C]reate new database")
-                print("[L]oad existing database")
-                print("[Q]uit")
-
                 answer = input("Select an option: ")
 
                 if answer in ['C', 'c']:
@@ -107,22 +103,16 @@ def main_menu(database):
                 elif answer in ['Q', 'q']:
                     return
 
+                else:
+                    print("[C]reate new database")
+                    print("[L]oad existing database")
+                    print("[Q]uit")
+
             except KeyboardInterrupt:
                 return
 
         else:
             try:
-                print("[A]dd new card")
-                print("[R]emove a card")
-                print("Take a qui[z]")
-                print("[L]earn new words")
-                print("L[i]st words")
-                print("[F]ind words")
-                print("S[t]atistics")
-                print("[S]ave database")
-                print("[C]lose database")
-                print("[Q]uit")
-
                 answer = input("Select an option: ")
 
                 if answer in ['A', 'a']:
@@ -166,6 +156,18 @@ def main_menu(database):
 
                 elif answer in ['Q', 'q']:
                     break
+
+                else:
+                    print("[A]dd new card")
+                    print("[R]emove a card")
+                    print("Take a qui[z]")
+                    print("[L]earn new words")
+                    print("L[i]st words")
+                    print("[F]ind words")
+                    print("S[t]atistics")
+                    print("[S]ave database")
+                    print("[C]lose database")
+                    print("[Q]uit")
 
             except KeyboardInterrupt:
                 if database.modified:
@@ -221,13 +223,17 @@ def promt_remove_card(database):
 
 
 def take_quiz(database):
-    length = int(input("How many words should the quiz contain? "))
-    quiz = make_quiz(database.categories, length)
-    correct, incorrect = do_quiz(database, quiz)
-    database.update(correct, incorrect)
+    try:
+        length = int(input("How many words should the quiz contain? "))
+        quiz = make_quiz(database.categories, length)
+        correct, incorrect = do_quiz(database, quiz)
+        database.update(correct, incorrect)
+
+    except KeyboardInterrupt:
+        return
 
 
-def make_quiz(words, length):
+def make_quiz(words, length, p=1/3):
     """Selects words for a quiz.
 
     words -- a list containing sets of words to form the quiz from
@@ -247,34 +253,38 @@ def make_quiz(words, length):
         return []
 
     # number of words from the list `words[0]`
-    words_from_this_category = min(numpy.random.binomial(length, 0.5), len(words[0]))
+    words_from_this_category = min(numpy.random.binomial(length, p), len(words[0]))
     # number of words from the lists `words[1:]`
     words_from_other_categories = length - words_from_this_category
 
     quiz = [random.sample(words[0], words_from_this_category)]
-    quiz += make_quiz(words[1:], words_from_other_categories)
+    quiz += make_quiz(words[1:], words_from_other_categories, p)
 
     return quiz
 
 
 def learn_cards(database):
-    length = int(input("How many words should the quiz contain? "))  #TODO
-    quiz = select_cards_to_learn(database.categories, length)
-    correct, incorrect = do_quiz(database, quiz)
-    database.update(correct, incorrect)
+    try:
+        length = int(input("How many words should the quiz contain? "))  #TODO
+        quiz = select_cards_to_learn(database.categories, length)
+        correct, incorrect = do_quiz(database, quiz)
+        database.update(correct, incorrect)
+
+    except KeyboardInterrupt:
+        return
 
 
-def select_cards_to_learn(words, length):
+def select_cards_to_learn(words, length, p=2/3):
     if not words or length == 0:
         return []
 
-    words_from_this_category = min(numpy.random.binomial(length, 2/3), len(words[0]))
+    words_from_this_category = min(numpy.random.binomial(length, p), len(words[0]))
     words_from_other_categories = length - words_from_this_category
 
     quiz = [x for x in words[0]]
     quiz.sort(key=hash)
     quiz = [quiz[:words_from_this_category]]
-    quiz += make_quiz(words[1:], words_from_other_categories)
+    quiz += make_quiz(words[1:], words_from_other_categories, p)
 
     return quiz
     
