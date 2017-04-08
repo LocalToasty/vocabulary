@@ -33,6 +33,7 @@ class Database:
         self.langs = langs
         self.categories = [set()]
         self.modified = False
+        self.path = ""
 
     def __len__(self):
         return self.no_of_cards_easier_than(0)
@@ -76,10 +77,11 @@ def load_database(path):
     database = None
     with open(path, "rb") as dbfile:
         database = pickle.load(dbfile)
-        database.modified = False
+
+    database.modified = False
+    database.path = path
 
     return database
-
 
 def main_menu(database):
     print("Vocabulary training program")
@@ -151,9 +153,13 @@ def main_menu(database):
                     print_statistics(database)
 
                 elif answer in ['S', 's']:
-                    path = input("Save database as: ")
+                    path = input("Save database as [{}]: "
+                                 .format(database.path))
+                    if path == "":
+                        path = database.path
                     with open(path, "wb") as dbfile:
                         pickle.dump(database, dbfile)
+                    database.path = path
 
                 elif answer in ['C', 'c']:
                     database = None
@@ -165,7 +171,10 @@ def main_menu(database):
                 if database.modified:
                     answer = input("Save changes? [Y/n] ")
                     if answer not in ['N', 'n']:
-                        path = input("Save database as: ")
+                        path = input("Save database as [{}]: "
+                                     .format(database.path))
+                        if path == "":
+                            path = database.path
                         with open(path, "wb") as dbfile:
                             pickle.dump(database, dbfile)
 
