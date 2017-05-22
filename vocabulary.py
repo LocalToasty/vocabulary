@@ -307,9 +307,9 @@ def flat_len(xss):
 
 def print_statistics(database):
     for difficulty, category in enumerate(database.categories):
-        print("{}:\t{}\twords".format(difficulty, len(category)))
+        print("{:5}: {:6} words".format(difficulty, len(category)))
 
-    print("total:\t{}\twords".format(len(database)))
+    print("total: {:6} words".format(len(database)))
 
 
 def list_cards(database):
