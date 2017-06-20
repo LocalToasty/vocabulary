@@ -118,7 +118,7 @@ def main_menu(database):
                 for difficulty, category in enumerate(database.categories):
                     for card in category:
                         if any(keyword in word for word in card.words) or keyword in card.comment:
-                            print(card)
+                            print("{:3}".format(difficulty), card)
 
             elif answer in ['T', 't']:
                 print_statistics(database)
