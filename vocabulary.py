@@ -118,7 +118,7 @@ def main_menu(database):
                 for difficulty, category in enumerate(database.categories):
                     for card in category:
                         if any(keyword in word for word in card.words) or keyword in card.comment:
-                            print(card)
+                            print("{:3}".format(difficulty), card)
 
             elif answer in ['T', 't']:
                 print_statistics(database)
@@ -307,9 +307,9 @@ def flat_len(xss):
 
 def print_statistics(database):
     for difficulty, category in enumerate(database.categories):
-        print("{}:\t{}\twords".format(difficulty, len(category)))
+        print("{:5}: {:6} words".format(difficulty, len(category)))
 
-    print("total:\t{}\twords".format(len(database)))
+    print("total: {:6} words".format(len(database)))
 
 
 def list_cards(database):
