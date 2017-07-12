@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import random
+import numpy.random
 import pickle
+import sys
 
 class Card:
     def __init__(self, words, comment):
@@ -15,7 +17,14 @@ class Card:
             res += "\t{}".format(lang)
 
         if self.comment:
-            res += "\t\t# " + self.comment
+            res += "\t# " + self.comment
+
+        return res
+
+    def __hash__(self):
+        res = hash(self.comment)
+        for lang in self.words:
+            res += hash(lang)
 
         return res
 
@@ -24,6 +33,8 @@ class Database:
     def __init__(self, langs):
         self.langs = langs
         self.categories = [set()]
+        self.modified = False
+        self.path = ""
 
     def __len__(self):
         return self.no_of_cards_easier_than(0)
@@ -41,22 +52,31 @@ class Database:
         The word is given a difficulty of 0 (i.e. unknown)."
         """
         self.categories[0].add(word)
+        self.modified = True
 
     def update(self, correct, incorrect):
-        if len(correct) == len(self.categories):
+        if len(correct) == len(self.categories) and correct[-1]:
             self.categories += [set()]
 
         for difficulty, words in enumerate(correct):
-            self.categories[difficulty] -= words
-            self.categories[difficulty + 1].update(words)
+            if words:
+                self.categories[difficulty] -= words
+                self.categories[difficulty + 1].update(words)
 
         for difficulty, words in enumerate(incorrect[1:]):
             self.categories[difficulty + 1] -= words
-            self.categories[difficulty].update(words)
+            self.categories[0].update(words)
+
+        self.modified = True
 
 
 def main():
-    main_menu(None)
+    if not len(sys.argv):
+        print("Usage: {} <file>".format(sys.argv[0]))
+        return
+
+    db = load_database(sys.argv[1])
+    main_menu(db)
 
 
 def load_database(path):
@@ -64,48 +84,22 @@ def load_database(path):
     with open(path, "rb") as dbfile:
         database = pickle.load(dbfile)
 
-    return database
+    database.modified = False
+    database.path = path
 
+    return database
 
 def main_menu(database):
     print("Vocabulary training program")
 
     while True:
-        if database is None:
-            print("[C]reate new database")
-            print("[L]oad existing database")
-            print("[Q]uit")
-
-            answer = input("Select an option: ")
-
-            if answer in ['C', 'c']:
-                database = promt_for_database()
-
-            elif answer in ['L', 'l']:
-                path = input("Enter database location: ")
-                database = load_database(path)
-                if database is None:
-                    print("Failed to load database")
-
-            elif answer in ['Q', 'q']:
-                break
-
-        else:
-            print("[A]dd new card")
-            print("[R]emove a card")
-            print("Take a qui[z]")
-            print("[L]ist words")
-            print("[F]ind words")
-            print("S[t]atistics")
-            print("[S]ave database")
-            print("[C]lose database")
-            print("[Q]uit")
-
+        try:
             answer = input("Select an option: ")
 
             if answer in ['A', 'a']:
                 word = promt_for_card(database.langs)
-                database.add_card(word)
+                if word:
+                    database.add_card(word)
 
             if answer in ['R', 'r']:
                 promt_remove_card(database)
@@ -114,10 +108,10 @@ def main_menu(database):
                 take_quiz(database)
 
             elif answer in ['L', 'l']:
-                for difficulty, category in enumerate(database.categories):
-                    print("### Difficulty {} ###".format(difficulty))
-                    for card in category:
-                        print(card)
+                learn_cards(database)
+
+            elif answer in ['I', 'i']:
+                list_cards(database)
 
             elif answer in ['F', 'f']:
                 keyword = input("Enter term to search for: ")
@@ -130,15 +124,44 @@ def main_menu(database):
                 print_statistics(database)
 
             elif answer in ['S', 's']:
-                path = input("Save database as: ")
+                path = input("Save database as [{}]: "
+                             .format(database.path))
+                if path == "":
+                    path = database.path
                 with open(path, "wb") as dbfile:
                     pickle.dump(database, dbfile)
+                database.path = path
 
             elif answer in ['C', 'c']:
                 database = None
 
             elif answer in ['Q', 'q']:
                 break
+
+            else:
+                print("[A]dd new card")
+                print("[R]emove a card")
+                print("Take a qui[z]")
+                print("[L]earn new words")
+                print("L[i]st words")
+                print("[F]ind words")
+                print("S[t]atistics")
+                print("[S]ave database")
+                print("[C]lose database")
+                print("[Q]uit")
+
+        except KeyboardInterrupt:
+            if database.modified:
+                answer = input("Save changes? [Y/n] ")
+                if answer not in ['N', 'n']:
+                    path = input("Save database as [{}]: "
+                                 .format(database.path))
+                    if path == "":
+                        path = database.path
+                    with open(path, "wb") as dbfile:
+                        pickle.dump(database, dbfile)
+
+            return
 
 
 def promt_for_database():
@@ -152,13 +175,18 @@ def promt_for_database():
 
 
 def promt_for_card(langs):
-    words = []
-    for lang in langs:
-        word = input("Enter your word in {}: ".format(lang))
-        words.append(word)
+    try:
+        words = []
+        for lang in langs:
+            word = input("Enter your word in {}: ".format(lang))
+            words.append(word)
 
-    comment = input("Enter comment: ")
-    return Card(words, comment)
+        comment = input("Enter comment: ")
+        return Card(words, comment)
+
+    except KeyboardInterrupt:
+        print()
+        return None
 
 
 def promt_remove_card(database):
@@ -176,13 +204,17 @@ def promt_remove_card(database):
 
 
 def take_quiz(database):
-    length = int(input("How many words should the quiz contain? "))
-    quiz = make_quiz(database.categories, length)
-    correct, incorrect = do_quiz(database, quiz)
-    database.update(correct, incorrect)
+    try:
+        length = int(input("How many words should the quiz contain? "))
+        quiz = make_quiz(database.categories, length)
+        correct, incorrect = do_quiz(database, quiz)
+        database.update(correct, incorrect)
+
+    except KeyboardInterrupt:
+        return
 
 
-def make_quiz(words, length):
+def make_quiz(words, length, p=1/3):
     """Selects words for a quiz.
 
     words -- a list containing sets of words to form the quiz from
@@ -202,14 +234,41 @@ def make_quiz(words, length):
         return []
 
     # number of words from the list `words[0]`
-    words_from_this_category = min(max(length // 2, 1), len(words[0]))
+    words_from_this_category = min(numpy.random.binomial(length, p), len(words[0]))
     # number of words from the lists `words[1:]`
     words_from_other_categories = length - words_from_this_category
 
     quiz = [random.sample(words[0], words_from_this_category)]
-    quiz += make_quiz(words[1:], words_from_other_categories)
+    quiz += make_quiz(words[1:], words_from_other_categories, p)
 
     return quiz
+
+
+def learn_cards(database):
+    try:
+        length = int(input("How many words should the quiz contain? "))  #TODO
+        quiz = select_cards_to_learn(database.categories, length)
+        correct, incorrect = do_quiz(database, quiz)
+        database.update(correct, incorrect)
+
+    except KeyboardInterrupt:
+        return
+
+
+def select_cards_to_learn(words, length, p=2/3):
+    if not words or length == 0:
+        return []
+
+    words_from_this_category = min(numpy.random.binomial(length, p), len(words[0]))
+    words_from_other_categories = length - words_from_this_category
+
+    quiz = [x for x in words[0]]
+    quiz.sort(key=hash)
+    quiz = [quiz[:words_from_this_category]]
+    quiz += make_quiz(words[1:], words_from_other_categories, p)
+
+    return quiz
+    
 
 
 def do_quiz(database, quiz):
@@ -218,26 +277,28 @@ def do_quiz(database, quiz):
         print("{}: {}".format(i, lang))
 
     from_lang = int(input("> "))
-        
+
     correct = [set() for _ in range(len(quiz))]
     incorrect = [set() for _ in range(len(quiz))]
 
-    for difficulty, cards in enumerate(quiz):
-        for question in cards:
-            print(question.words[from_lang])
+    try:
+        for difficulty, cards in enumerate(quiz):
+            for question in cards:
+                print(question.words[from_lang])
 
-            input("Press [enter] to show solution")
-            print(question)
+                input("Press [enter] to show solution")
+                print(question)
 
-            res = input("Did you answer correctly? [y/N] ")
-            if res in ['Y', 'y']:
-                correct[difficulty].add(question)
-            else:
-                incorrect[difficulty].add(question)
+                res = input("Did you answer correctly? [y/N] ")
+                if res in ['Y', 'y']:
+                    correct[difficulty].add(question)
+                else:
+                    incorrect[difficulty].add(question)
 
-    print("{}/{} answered correctly".format(flat_len(correct), flat_len(correct) + flat_len(incorrect)))
+    finally:
+        print("{}/{} answered correctly".format(flat_len(correct), flat_len(correct) + flat_len(incorrect)))
 
-    return (correct, incorrect)
+        return (correct, incorrect)
 
 
 def flat_len(xss):
@@ -251,4 +312,19 @@ def print_statistics(database):
     print("total:\t{}\twords".format(len(database)))
 
 
-main()
+def list_cards(database):
+    line = 0
+    for difficulty, category in enumerate(database.categories):
+        print("### Difficulty {} ###".format(difficulty))
+        line += 1
+        for card in category:
+            if line >= 20:
+                input()
+                line = 0
+
+            print(card)
+            line += 1
+
+
+if __name__ == "__main__":
+    main()
