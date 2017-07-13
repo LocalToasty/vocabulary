@@ -105,18 +105,21 @@ def main():
         except (KeyboardInterrupt, EOFError):
             break
 
-        if choice in ["a", "A"]:
-            add_card(db)
-        if choice in ["r", "R"]:
-            remove_card(db)
-        elif choice in ["q", "q"]:
-            learn(db)
-        elif choice in ["l", "l"]:
-            list_cards(db)
-        elif choice in ["f", "F"]:
-            find(db)
-        elif choice in ["s", "S"]:
-            save(db)
+        try:
+            if choice in ["a", "A"]:
+                add_card(db)
+            if choice in ["r", "R"]:
+                remove_card(db)
+            elif choice in ["q", "q"]:
+                learn(db)
+            elif choice in ["l", "l"]:
+                list_cards(db)
+            elif choice in ["f", "F"]:
+                find(db)
+            elif choice in ["s", "S"]:
+                save(db)
+        except (KeyboardInterrupt, EOFError):
+            pass
 
     print()
     if db.changes and ask_yes_no("Save changes?", default=True):
@@ -148,6 +151,7 @@ def remove_card(db):
             print("Removed {}".format(card))
             db.cards.remove(card)
             heapq.heapify(db.cards)
+            break
 
 def learn(db):
     if not db.cards or not db.top().is_due():
