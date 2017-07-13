@@ -18,12 +18,13 @@ class DatabaseEncoder(json.JSONEncoder):
         words = []
         for i, cat in enumerate(db.categories):
             for word in cat:
-                proficiency = 24*60*60*i*i + random.random() * 0.2 * 24*60*60*i*i
+                proficiency = 24*60*60*i*i / 2
                 words.append({
-                    "entries": word.words,
+                    "entries": [{"text": word,
+                                 "proficiency": proficiency,
+                                 "due": time.time() + proficiency + random.random() * 0.2 * proficiency
+                                 } for word in words.words],
                     "comment": word.comment,
-                    "proficiency": proficiency,
-                    "due": time.time() + proficiency
                 })
         
         return {
