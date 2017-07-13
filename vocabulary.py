@@ -79,13 +79,21 @@ def main():
         print("Usage: {} <file>".format(sys.argv[0]))
         return
 
-    db = None
-    with open(sys.argv[1], "r") as dbfile:
-        global path
-        path = sys.argv[1]
-        db = Database.from_dict(json.load(dbfile))
+    global path
+    path = sys.argv[1]
 
-    if db.top():
+    db = None
+    try:
+        with open(sys.argv[1], "r") as dbfile:
+            db = Database.from_dict(json.load(dbfile))
+    except:
+        n = int(input("How many entries per card? "))
+        langs = []
+        for i in range(n):
+            langs.append(input("Name of entry {}: ".format(i)))
+        db = Database(langs)
+
+    if db.cards:
         if  db.top().is_due():
             print("Cards ready for repetition")
         else:
@@ -114,9 +122,10 @@ def main():
     if db.changes and ask_yes_no("Save changes?", default=True):
         save(db)
 
-    print("Come back on",
-          time.asctime(time.localtime(max(time.time(),
-                                          heapq.nsmallest(min(24, len(db.cards)), db.cards)[-1].due))))
+    if db.cards:
+        print("Come back on",
+              time.asctime(time.localtime(max(time.time(),
+                                              heapq.nsmallest(min(24, len(db.cards)), db.cards)[-1].due))))
 
 def add_card(db):
     try:
@@ -204,15 +213,21 @@ def list_cards(db):
 
 def save(db):
     global path
-    if path:
-        new_path = input("Save as [" + path + "]: ")
-        if new_path:
-            path = new_path
-    else:
-        path = input("Save as: ")
+    while True:
+        try:
+            if path:
+                new_path = input("Save as [" + path + "]: ")
+                if new_path:
+                    path = new_path
+            else:
+                path = input("Save as: ")
 
-    with open(path, "w") as dbfile:
-        dbfile.write(json.dumps(db, cls=DatabaseEncoder, indent=2))
+            with open(path, "w") as dbfile:
+                dbfile.write(json.dumps(db, cls=DatabaseEncoder, indent=2))
+            break
+        except FileNotFoundError:
+            pass
+
     db.changes = False
 
 
