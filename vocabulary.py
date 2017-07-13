@@ -233,7 +233,13 @@ def find(db):
 
 
 def stats(db):
-    print("Total:", len(db.cards), "cards")
+    print("Total:", len(db.cards))
+    cards = db.cards.copy()
+    n = 0
+    while cards and heapq.heappop(cards).is_due():
+        n += 1
+    print("Due:", n)
+
 
 
 def save(db):
