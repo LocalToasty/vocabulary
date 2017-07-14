@@ -6,6 +6,7 @@ import sys
 import json
 import time
 import heapq
+import re
 
 path = ""
 
@@ -226,20 +227,33 @@ def ask_yes_no(question, default):
 
 
 def find(db):
-    keyword = input("Seach for: ")
+    prog = None
+    try:
+        prog = re.compile(input("Seach for: "))
+    except re.error as e:
+        print("Error while compiling regular expression:", e.msg)
+        return
+
     for card in db.cards:
-        if any(keyword in entry.text for entry in card.entries) or keyword in card.comment:
+        if any(prog.match(entry.text) for entry in card.entries) or prog.match(card.comment):
             print(time.asctime(time.localtime(card.due_at())), card)
 
 
 def stats(db):
     print("Total:", len(db.cards))
     cards = db.cards.copy()
+
+    print("Cards Due:")
     n = 0
     while cards and heapq.heappop(cards).is_due():
         n += 1
-    print("Due:", n)
-
+    print("  Now:      ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60:
+        n += 1
+    print("  Tomorrow: ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60*7:
+        n += 1
+    print("  Next week:", n)
 
 
 def save(db):
@@ -258,7 +272,7 @@ def save(db):
                 path = input("Save as: ")
 
             with open(path, "w") as dbfile:
-                dbfile.write(json.dumps(db, cls=DatabaseEncoder, indent=2))
+                json.dump(db, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
             break
         except FileNotFoundError:
             pass
