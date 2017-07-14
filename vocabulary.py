@@ -247,13 +247,19 @@ def stats(db):
     n = 0
     while cards and heapq.heappop(cards).is_due():
         n += 1
-    print("  Now:      ", n)
+    print("  Now:          ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 6*60*60:
+        n += 1
+    print("  In six hours: ", n)
     while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60:
         n += 1
-    print("  Tomorrow: ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60*7:
+    print("  Tomorrow:     ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 2*24*60*60:
         n += 1
-    print("  Next week:", n)
+    print("  In two days:  ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 3*24*60*60:
+        n += 1
+    print("  In three days:", n)
 
 
 def save(db):
