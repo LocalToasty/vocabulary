@@ -229,7 +229,7 @@ def ask_yes_no(question, default):
 def find(db):
     prog = None
     try:
-        prog = re.compile(input("Seach for: "))
+        prog = re.compile(".*" + input("Seach for: "))
     except re.error as e:
         print("Error while compiling regular expression:", e.msg)
         return
