@@ -27,9 +27,9 @@ class Card:
     def __str__(self):
         res = str(self.entries[0])
         for e in self.entries[1:]:
-            res += "\t" + str(e)
+            res += " \t" + str(e)
         if self.comment:
-            res += "\t# " + self.comment
+            res += " \t# " + self.comment
         return res
 
     def __lt__(self, other):
