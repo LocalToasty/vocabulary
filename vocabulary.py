@@ -206,7 +206,7 @@ def learn(db):
             if ask_yes_no("Correct?", default=False):
                 entry.proficiency = entry.proficiency * 2 + 0.2 * random.random() * (time.time() - entry.due)
             else:
-                entry.proficiency = 1
+                entry.proficiency = max(entry.proficiency / 128, 1)
             entry.due = time.time() + entry.proficiency
             db.add(card)
         except (KeyboardInterrupt, EOFError):
