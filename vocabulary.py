@@ -56,8 +56,11 @@ class Database:
         self.cards = []
         self.changes = False
 
+        self.retention = [1., 1.]
+
     def from_dict(dct):
         db = Database(dct["langs"])
+        db.retention = dct["retention"]
         n = 0
         for c in dct["cards"]:
             n += 1
@@ -83,6 +86,7 @@ class DatabaseEncoder(json.JSONEncoder):
     def default(self, db):
         return {
             "langs": db.langs,
+            "retention": db.retention,
             "cards": [{
                 "entries": [{
                     "text": entry.text,
@@ -203,7 +207,9 @@ def learn(db):
             input()
             print(card)
 
+            db.retention[1] += entry.proficiency
             if ask_yes_no("Correct?", default=False):
+                db.retention[0] += entry.proficiency
                 entry.proficiency = entry.proficiency * 2 + 0.2 * random.random() * (time.time() - entry.due)
             else:
                 entry.proficiency = max(entry.proficiency / 128, 1)
@@ -241,8 +247,10 @@ def find(db):
 
 def stats(db):
     print("Total:", len(db.cards))
-    cards = db.cards.copy()
 
+    print("Retention score:", int(1000 * db.retention[0]/db.retention[1]))
+
+    cards = db.cards.copy()
     print("Cards Due:")
     n = 0
     while cards and heapq.heappop(cards).is_due():

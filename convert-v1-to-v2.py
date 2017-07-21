@@ -29,6 +29,7 @@ class DatabaseEncoder(json.JSONEncoder):
         
         return {
             "langs": db.langs,
+            "retention": [1.0, 1.0],
             "cards": words
         }
     
