@@ -18,7 +18,7 @@ class DatabaseEncoder(json.JSONEncoder):
         words = []
         for i, cat in enumerate(db.categories):
             for word in cat:
-                proficiency = 24*60*60*i*i / 2
+                proficiency = 24*60*60*i*i
                 words.append({
                     "entries": [{"text": word,
                                  "proficiency": proficiency,
