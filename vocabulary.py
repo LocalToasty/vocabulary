@@ -24,6 +24,12 @@ class Card:
     def is_due(self):
         return time.time() >= self.due_at()
 
+    def print(self):
+        for e in self.entries:
+            print(e)
+        if self.comment:
+            print(self.comment)
+
     def __str__(self):
         res = str(self.entries[0])
         for e in self.entries[1:]:
@@ -31,6 +37,9 @@ class Card:
         if self.comment:
             res += " \t# " + self.comment
         return res
+
+    def __repr__(self):
+        return str(self)
 
     def __lt__(self, other):
         return self.due_at() < other.due_at()
@@ -54,12 +63,13 @@ class Database:
     def __init__(self, langs):
         self.langs = langs
         self.cards = []
-        self.changes = False
+        self.changes = True
 
         self.retention = [1., 1.]
 
     def from_dict(dct):
         db = Database(dct["langs"])
+        db.changes = False
         db.retention = dct["retention"]
         n = 0
         for c in dct["cards"]:
@@ -205,9 +215,6 @@ def learn(db):
 
     end_time = time.time() + duration * 60
 
-    # clear screen
-    print(chr(27) + "[2J")
-
     while time.time() < end_time:
         if not db.top().is_due():
             print("Next cards ready on", time.asctime(time.localtime(db.top().due_at())))
@@ -216,9 +223,12 @@ def learn(db):
         try:
             card = db.pop()
             entry = card.due_entry()
+
+            print(chr(27) + "[2J")
             print(entry, end=" ")
             input()
-            print(card)
+            print(chr(27) + "[2J")
+            card.print()
 
             db.retention[1] += entry.proficiency
             if ask_yes_no("Correct?", default=False):
