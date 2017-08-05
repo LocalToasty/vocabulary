@@ -233,7 +233,7 @@ def learn(db):
             db.retention[1] += entry.proficiency
             if ask_yes_no("Correct?", default=False):
                 db.retention[0] += entry.proficiency
-                entry.proficiency = entry.proficiency * 2 + 0.2 * random.random() * (time.time() - entry.due)
+                entry.proficiency = entry.proficiency * 2 + random.random() * (time.time() - entry.due)
             else:
                 entry.proficiency = max(entry.proficiency / 128, 1)
             entry.due = time.time() + entry.proficiency
