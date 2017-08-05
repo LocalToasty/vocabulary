@@ -2,253 +2,297 @@
 
 import random
 import pickle
+import sys
+import json
+import time
+import heapq
+import re
+
+path = ""
 
 class Card:
-    def __init__(self, words, comment):
-        self.words = words
+    def __init__(self, entries, comment):
+        self.entries = entries
         self.comment = comment
 
+    def due_entry(self):
+        return min(self.entries)
+
+    def due_at(self):
+        return min([entry.due for entry in self.entries])
+
+    def is_due(self):
+        return time.time() >= self.due_at()
+
     def __str__(self):
-        res = self.words[0]
-
-        for lang in self.words[1:]:
-            res += "\t{}".format(lang)
-
+        res = str(self.entries[0])
+        for e in self.entries[1:]:
+            res += " \t" + str(e)
         if self.comment:
-            res += "\t\t# " + self.comment
-
+            res += " \t# " + self.comment
         return res
 
+    def __lt__(self, other):
+        return self.due_at() < other.due_at()
+
+class Entry:
+    def __init__(self, text, proficiency=1, due=None):
+        self.text = text
+        self.proficiency = proficiency
+        if due:
+            self.due = due
+        else:
+            self.due = time.time() + 5 * 60 * random.random()
+
+    def __str__(self):
+        return self.text
+
+    def __lt__(self, other):
+        return self.due < other.due
+
 class Database:
-    """Contains multiple words."""
     def __init__(self, langs):
         self.langs = langs
-        self.categories = [set()]
+        self.cards = []
+        self.changes = False
 
-    def __len__(self):
-        return self.no_of_cards_easier_than(0)
+        self.retention = [1., 1.]
 
-    def no_of_cards_easier_than(self, difficulty):
-        length = 0
-        for category in self.categories[difficulty:]:
-            length += len(category)
+    def from_dict(dct):
+        db = Database(dct["langs"])
+        db.retention = dct["retention"]
+        n = 0
+        for c in dct["cards"]:
+            n += 1
+            card = Card([Entry(e["text"], e["proficiency"], e["due"])
+                         for e in c["entries"]],
+                        c["comment"])
+            db.cards.append(card)
+        heapq.heapify(db.cards)
+        return db
 
-        return length
+    def add(self, card):
+        self.changes = True
+        heapq.heappush(self.cards, card)
 
-    def add_card(self, word):
-        """Adds a new word to the data base.
+    def pop(self):
+        self.changes = True
+        return heapq.heappop(self.cards)
 
-        The word is given a difficulty of 0 (i.e. unknown)."
-        """
-        self.categories[0].add(word)
+    def top(self):
+        return self.cards[0]
 
-    def update(self, correct, incorrect):
-        if len(correct) == len(self.categories):
-            self.categories += [set()]
-
-        for difficulty, words in enumerate(correct):
-            self.categories[difficulty] -= words
-            self.categories[difficulty + 1].update(words)
-
-        for difficulty, words in enumerate(incorrect[1:]):
-            self.categories[difficulty + 1] -= words
-            self.categories[difficulty].update(words)
+class DatabaseEncoder(json.JSONEncoder):
+    def default(self, db):
+        return {
+            "langs": db.langs,
+            "retention": db.retention,
+            "cards": [{
+                "entries": [{
+                    "text": entry.text,
+                    "proficiency": entry.proficiency,
+                    "due": entry.due
+                } for entry in card.entries],
+                "comment": card.comment,
+            } for card in db.cards]
+        }
 
 
 def main():
-    main_menu(None)
+    if len(sys.argv) != 2:
+        print("Usage: {} <file>".format(sys.argv[0]))
+        return
 
+    global path
+    path = sys.argv[1]
 
-def load_database(path):
-    database = None
-    with open(path, "rb") as dbfile:
-        database = pickle.load(dbfile)
+    db = None
+    try:
+        with open(sys.argv[1], "r") as dbfile:
+            db = Database.from_dict(json.load(dbfile))
+    except FileNotFoundError:
+        n = int(input("How many entries per card? "))
+        langs = []
+        for i in range(n):
+            langs.append(input("Name of entry {}: ".format(i)))
+        db = Database(langs)
 
-    return database
-
-
-def main_menu(database):
-    print("Vocabulary training program")
+    if db.cards:
+        if  db.top().is_due():
+            print("Cards ready for repetition")
+        else:
+            print("Next card ready on", time.asctime(time.localtime(db.top().due_at())))
 
     while True:
-        if database is None:
-            print("[C]reate new database")
-            print("[L]oad existing database")
-            print("[Q]uit")
+        try:
+            choice = input("> ")
+        except (KeyboardInterrupt, EOFError):
+            break
 
-            answer = input("Select an option: ")
+        try:
+            if choice in ["a", "A"]:
+                add_card(db)
+            if choice in ["r", "R"]:
+                remove_card(db)
+            elif choice in ["l", "l"]:
+                learn(db)
+            elif choice in ["f", "F"]:
+                find(db)
+            elif choice in ["t", "T"]:
+                stats(db)
+            elif choice in ["s", "S"]:
+                save(db)
+        except (KeyboardInterrupt, EOFError):
+            pass
 
-            if answer in ['C', 'c']:
-                database = promt_for_database()
+    print()
+    if db.changes and ask_yes_no("Save changes?", default=True):
+        save(db)
 
-            elif answer in ['L', 'l']:
-                path = input("Enter database location: ")
-                database = load_database(path)
-                if database is None:
-                    print("Failed to load database")
+    if db.cards:
+        print("Come back on",
+              time.asctime(time.localtime(max(time.time(),
+                                              heapq.nsmallest(min(16, len(db.cards)), db.cards)[-1].due_at()))))
 
-            elif answer in ['Q', 'q']:
-                break
+def add_card(db):
+    try:
+        entries = []
+        for lang in db.langs:
+            entry = Entry(input(lang + ": "))
+            entries.append(entry)
 
-        else:
-            print("[A]dd new card")
-            print("[R]emove a card")
-            print("Take a qui[z]")
-            print("[L]ist words")
-            print("[F]ind words")
-            print("S[t]atistics")
-            print("[S]ave database")
-            print("[C]lose database")
-            print("[Q]uit")
+        comment = input("Comment: ")
+        db.add(Card(entries, comment))
 
-            answer = input("Select an option: ")
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return None
 
-            if answer in ['A', 'a']:
-                word = promt_for_card(database.langs)
-                database.add_card(word)
-
-            if answer in ['R', 'r']:
-                promt_remove_card(database)
-
-            elif answer in ['Z', 'z']:
-                take_quiz(database)
-
-            elif answer in ['L', 'l']:
-                for difficulty, category in enumerate(database.categories):
-                    print("### Difficulty {} ###".format(difficulty))
-                    for card in category:
-                        print(card)
-
-            elif answer in ['F', 'f']:
-                keyword = input("Enter term to search for: ")
-                for difficulty, category in enumerate(database.categories):
-                    for card in category:
-                        if any(keyword in word for word in card.words) or keyword in card.comment:
-                            print(card)
-
-            elif answer in ['T', 't']:
-                print_statistics(database)
-
-            elif answer in ['S', 's']:
-                path = input("Save database as: ")
-                with open(path, "wb") as dbfile:
-                    pickle.dump(database, dbfile)
-
-            elif answer in ['C', 'c']:
-                database = None
-
-            elif answer in ['Q', 'q']:
-                break
-
-
-def promt_for_database():
-    lang_no = int(input("How many languages? "))
-    langs = []
-    for i in range(lang_no):
-        lang = input("Enter name of language {}: ".format(i + 1))
-        langs += [lang]
-
-    return Database(langs)
-
-
-def promt_for_card(langs):
-    words = []
-    for lang in langs:
-        word = input("Enter your word in {}: ".format(lang))
-        words.append(word)
-
-    comment = input("Enter comment: ")
-    return Card(words, comment)
-
-
-def promt_remove_card(database):
+def remove_card(db):
     content = input("Enter card to remove: ")
-    to_remove = None
-    for category in database.categories:
-        for card in category:
-            if content in card.words:
-                to_remove = (category, card)
+    for card in db.cards:
+        if content in [e.text for e in card.entries]:
+            print("Removed {}".format(card))
+            db.cards.remove(card)
+            heapq.heapify(db.cards)
+            break
 
-    if to_remove is not None:
-        category, card = to_remove
-        print("Removed {}".format(card))
-        category.remove(card)
+def learn(db):
+    if not db.cards or not db.top().is_due():
+        print("No cards to learn")
+        return
 
+    duration = 0
+    while True:
+        try:
+            duration = float(input("Duration (min): "))
+            break
+        except ValueError:
+            pass
 
-def take_quiz(database):
-    length = int(input("How many words should the quiz contain? "))
-    quiz = make_quiz(database.categories, length)
-    correct, incorrect = do_quiz(database, quiz)
-    database.update(correct, incorrect)
+    end_time = time.time() + duration * 60
 
+    # clear screen
+    print(chr(27) + "[2J")
 
-def make_quiz(words, length):
-    """Selects words for a quiz.
+    while time.time() < end_time:
+        if not db.top().is_due():
+            print("Next cards ready on", time.asctime(time.localtime(db.top().due_at())))
+            break
 
-    words -- a list containing sets of words to form the quiz from
-    n     -- length of questions in the quiz
+        try:
+            card = db.pop()
+            entry = card.due_entry()
+            print(entry, end=" ")
+            input()
+            print(card)
 
-    `words` is a list of sets of words, where `words[0]` contains words which
-    the trainee is most inexperienced with, `words[1]` those they know better,
-    and so forth.  The final quiz will contain n/(i+1) words from the list
-    `words[i]`.
-
-    If there are not enough words of a certain difficulty, words from the next
-    harder one will be selected.
-
-    """
-
-    if not words or length == 0:
-        return []
-
-    # number of words from the list `words[0]`
-    words_from_this_category = min(max(length // 2, 1), len(words[0]))
-    # number of words from the lists `words[1:]`
-    words_from_other_categories = length - words_from_this_category
-
-    quiz = [random.sample(words[0], words_from_this_category)]
-    quiz += make_quiz(words[1:], words_from_other_categories)
-
-    return quiz
-
-
-def do_quiz(database, quiz):
-    print("Which language should be shown?")
-    for i, lang in enumerate(database.langs):
-        print("{}: {}".format(i, lang))
-
-    from_lang = int(input("> "))
-        
-    correct = [set() for _ in range(len(quiz))]
-    incorrect = [set() for _ in range(len(quiz))]
-
-    for difficulty, cards in enumerate(quiz):
-        for question in cards:
-            print(question.words[from_lang])
-
-            input("Press [enter] to show solution")
-            print(question)
-
-            res = input("Did you answer correctly? [y/N] ")
-            if res in ['Y', 'y']:
-                correct[difficulty].add(question)
+            db.retention[1] += entry.proficiency
+            if ask_yes_no("Correct?", default=False):
+                db.retention[0] += entry.proficiency
+                entry.proficiency = entry.proficiency * 2 + 0.2 * random.random() * (time.time() - entry.due)
             else:
-                incorrect[difficulty].add(question)
-
-    print("{}/{} answered correctly".format(flat_len(correct), flat_len(correct) + flat_len(incorrect)))
-
-    return (correct, incorrect)
-
-
-def flat_len(xss):
-    return sum([len(xs) for xs in xss])
+                entry.proficiency = max(entry.proficiency / 128, 1)
+            entry.due = time.time() + entry.proficiency
+            db.add(card)
+        except (KeyboardInterrupt, EOFError):
+            db.add(card)
+            break
 
 
-def print_statistics(database):
-    for difficulty, category in enumerate(database.categories):
-        print("{}:\t{}\twords".format(difficulty, len(category)))
+def ask_yes_no(question, default):
+    print(question, end=" ")
+    if default:
+        print("[Y/n]: ", end="")
+    else:
+        print("[y/N]: ", end="")
+    answer = input()
+    if answer in ["y", "Y"]: return True
+    elif answer in ["n", "N"]: return False
+    else: return default
 
-    print("total:\t{}\twords".format(len(database)))
+
+def find(db):
+    prog = None
+    try:
+        prog = re.compile(".*" + input("Seach for: "))
+    except re.error as e:
+        print("Error while compiling regular expression:", e.msg)
+        return
+
+    for card in db.cards:
+        if any(prog.match(entry.text) for entry in card.entries) or prog.match(card.comment):
+            print(time.asctime(time.localtime(card.due_at())), card)
 
 
-main()
+def stats(db):
+    print("Total:", len(db.cards))
+
+    print("Retention score:", int(1000 * db.retention[0]/db.retention[1]))
+
+    cards = db.cards.copy()
+    print("Cards Due:")
+    n = 0
+    while cards and heapq.heappop(cards).is_due():
+        n += 1
+    print("  Now:          ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 6*60*60:
+        n += 1
+    print("  In six hours: ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60:
+        n += 1
+    print("  Tomorrow:     ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 2*24*60*60:
+        n += 1
+    print("  In two days:  ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 3*24*60*60:
+        n += 1
+    print("  In three days:", n)
+
+
+def save(db):
+    if not db.changes:
+        print("No changes to be saved")
+        return
+
+    global path
+    while True:
+        try:
+            if path:
+                new_path = input("Save as [" + path + "]: ")
+                if new_path:
+                    path = new_path
+            else:
+                path = input("Save as: ")
+
+            with open(path, "w") as dbfile:
+                json.dump(db, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
+            break
+        except FileNotFoundError:
+            pass
+
+    db.changes = False
+
+
+if __name__ == "__main__":
+    main()
