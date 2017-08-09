@@ -158,8 +158,10 @@ def add_card(db):
     try:
         entries = []
         for lang in db.langs:
-            entry = Entry(input(lang + ": "))
-            entries.append(entry)
+            text = input(lang + ": ")
+            if text == '"""':
+                text = multiline_input()
+            entries.append(Entry(text))
 
         comment = input("Comment: ")
         db.add(Card(entries, comment))
@@ -167,6 +169,17 @@ def add_card(db):
     except (KeyboardInterrupt, EOFError):
         print()
         return None
+
+
+def multiline_input():
+    inp = input()
+    res = ""
+    while inp != '"""':
+        res += inp + "\n"
+        inp = input()
+
+    return res
+
 
 def remove_card(db):
     content = input("Enter card to remove: ")
