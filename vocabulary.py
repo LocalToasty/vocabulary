@@ -45,7 +45,7 @@ class Card:
         return self.due_at() < other.due_at()
 
 class Entry:
-    def __init__(self, text, proficiency=1, due=None):
+    def __init__(self, text, proficiency=60, due=None):
         self.text = text
         self.proficiency = proficiency
         if due:
@@ -71,14 +71,21 @@ class Database:
         db = Database(dct["langs"])
         db.changes = False
         db.retention = dct["retention"]
-        n = 0
         for c in dct["cards"]:
-            n += 1
             card = Card([Entry(e["text"], e["proficiency"], e["due"])
                          for e in c["entries"]],
                         c["comment"])
             db.cards.append(card)
         heapq.heapify(db.cards)
+
+        if len(db.cards) > 100:
+            cards = heapq.nsmallest(100, db.cards)
+            if cards[-1].is_due():
+                off = time.time() - cards[-1].due_at()
+                for card in db.cards:
+                    for entry in card.entries:
+                        if entry.due > cards[-1].due_at():
+                            entry.due += off
         return db
 
     def add(self, card):
@@ -230,12 +237,13 @@ def learn(db):
             print(chr(27) + "[2J")
             card.print()
 
+            correct = ask_yes_no("Correct?", default=False)
             db.retention[1] += entry.proficiency
-            if ask_yes_no("Correct?", default=False):
+            if correct:
                 db.retention[0] += entry.proficiency
-                entry.proficiency = entry.proficiency * 2 + random.random() * (time.time() - entry.due)
+                entry.proficiency = entry.proficiency * 1.5 + random.random() * (time.time() - entry.due)
             else:
-                entry.proficiency = max(entry.proficiency / 128, 1)
+                entry.proficiency = max(entry.proficiency / 128, 60.)
             entry.due = time.time() + entry.proficiency
             db.add(card)
         except (KeyboardInterrupt, EOFError):
@@ -278,19 +286,19 @@ def stats(db):
     n = 0
     while cards and heapq.heappop(cards).is_due():
         n += 1
-    print("  Now:          ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 6*60*60:
+    print("  Now:            ", n)
+    while cards and heapq.heappop(cards).due_at() <= time.time() + 12*60*60:
         n += 1
-    print("  In six hours: ", n)
+    print("  In twelve hours:", n)
     while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60:
         n += 1
-    print("  Tomorrow:     ", n)
+    print("  Tomorrow:       ", n)
     while cards and heapq.heappop(cards).due_at() <= time.time() + 2*24*60*60:
         n += 1
-    print("  In two days:  ", n)
+    print("  In two days:    ", n)
     while cards and heapq.heappop(cards).due_at() <= time.time() + 3*24*60*60:
         n += 1
-    print("  In three days:", n)
+    print("  In three days:  ", n)
 
 
 def save(db):
