@@ -7,6 +7,7 @@ import json
 import time
 import heapq
 import re
+from math import log
 
 path = ""
 
@@ -84,7 +85,8 @@ class Database:
                 off = time.time() - cards[-1].due_at()
                 for card in db.cards:
                     for entry in card.entries:
-                        entry.due += off
+                        if entry.due > cards[-1].due_at():
+                            entry.due += off
         return db
 
     def add(self, card):
@@ -240,7 +242,8 @@ def learn(db):
             db.retention[1] += entry.proficiency
             if correct:
                 db.retention[0] += entry.proficiency
-                entry.proficiency = entry.proficiency * 1.5 + random.random() * (time.time() - entry.due)
+                entry.proficiency = entry.proficiency * 2 + random.random() * 3600 * \
+                    log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
             else:
                 entry.proficiency = max(entry.proficiency / 128, 60.)
             entry.due = time.time() + entry.proficiency
