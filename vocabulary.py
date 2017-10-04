@@ -84,8 +84,7 @@ class Database:
                 off = time.time() - cards[-1].due_at()
                 for card in db.cards:
                     for entry in card.entries:
-                        if entry.due > cards[-1].due_at():
-                            entry.due += off
+                        entry.due += off
         return db
 
     def add(self, card):
