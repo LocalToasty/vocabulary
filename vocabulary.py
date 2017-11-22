@@ -79,8 +79,8 @@ class Database:
             db.cards.append(card)
         heapq.heapify(db.cards)
 
-        if len(db.cards) > 100:
-            cards = heapq.nsmallest(100, db.cards)
+        if len(db.cards) > 64:
+            cards = heapq.nsmallest(64, db.cards)
             if cards[-1].is_due():
                 off = time.time() - cards[-1].due_at()
                 for card in db.cards:
@@ -284,23 +284,10 @@ def stats(db):
     print("Retention score:", int(1000 * db.retention[0]/db.retention[1]))
 
     cards = db.cards.copy()
-    print("Cards Due:")
     n = 0
     while cards and heapq.heappop(cards).is_due():
         n += 1
-    print("  Now:            ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 12*60*60:
-        n += 1
-    print("  In twelve hours:", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60:
-        n += 1
-    print("  Tomorrow:       ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 2*24*60*60:
-        n += 1
-    print("  In two days:    ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 3*24*60*60:
-        n += 1
-    print("  In three days:  ", n)
+    print("Cards due:", n)
 
 
 def save(db):
