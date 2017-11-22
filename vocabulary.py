@@ -206,6 +206,7 @@ def remove_card(db):
             print("Removed {}".format(card))
             db.cards.remove(card)
             heapq.heapify(db.cards)
+            db.changes = True
             break
 
 def learn(db):
