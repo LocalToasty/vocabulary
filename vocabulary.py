@@ -243,10 +243,9 @@ def learn(db):
             db.retention[1] += entry.proficiency
             if correct:
                 db.retention[0] += entry.proficiency
-                entry.proficiency = entry.proficiency * 2 + random.random() * 3600 * \
-                    log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
+                entry.proficiency = entry.proficiency * 2 + random.random() * 3600 * log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
             else:
-                entry.proficiency = max(entry.proficiency / 128, 60.)
+                entry.proficiency = max(entry.proficiency / 16, 60.)
             entry.due = time.time() + entry.proficiency
             db.add(card)
         except (KeyboardInterrupt, EOFError):
@@ -261,7 +260,7 @@ def ask_yes_no(question, default):
     else:
         print("[y/N]: ", end="")
     answer = input()
-    if answer in ["y", "Y"]: return True
+    if answer in ["y", "Y", "u", "U", "t", "T"]: return True
     elif answer in ["n", "N"]: return False
     else: return default
 
