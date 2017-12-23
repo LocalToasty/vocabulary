@@ -15,6 +15,7 @@ class Card:
     def __init__(self, entries, comment):
         self.entries = entries
         self.comment = comment
+        self.added = time.time()
 
     def due_entry(self):
         return min(self.entries)
@@ -76,6 +77,8 @@ class Database:
             card = Card([Entry(e["text"], e["proficiency"], e["due"])
                          for e in c["entries"]],
                         c["comment"])
+            if "added" in c:
+                card.added = c["added"]
             db.cards.append(card)
         heapq.heapify(db.cards)
 
@@ -105,14 +108,16 @@ class DatabaseEncoder(json.JSONEncoder):
         return {
             "langs": db.langs,
             "retention": db.retention,
-            "cards": [{
+            "cards": sorted([{
                 "entries": [{
                     "text": entry.text,
                     "proficiency": entry.proficiency,
                     "due": entry.due
                 } for entry in card.entries],
+                "added": card.added,
                 "comment": card.comment,
-            } for card in db.cards]
+            } for card in db.cards],
+                            key=lambda x: x['added'])
         }
 
 
