@@ -41,8 +41,8 @@ def main():
 
     plt.plot(range(len(dues_per_day)), dues_per_day)
     plt.plot(range(len(entries_per_day)), entries_per_day)
-    plt.xlim(xmin=0, xmax=len(dues_per_day) - 1)
-    plt.ylim(ymin=0)
+    #plt.xlim(xmin=0, xmax=len(dues_per_day) - 1)
+    #plt.ylim(ymin=0)
     plt.xlabel("Days")
     plt.ylabel("Entries")
     plt.grid(True)
