@@ -8,16 +8,32 @@ import time
 import heapq
 import re
 from math import log
+from typing import List
 
 path = ""
 
+class Entry:
+    def __init__(self, text: str, proficiency: float = 60, due: float = None) -> None:
+        self.text = text
+        self.proficiency = proficiency
+        if due:
+            self.due = due
+        else:
+            self.due = time.time() + 5 * 60 * random.random()
+
+    def __str__(self):
+        return self.text
+
+    def __lt__(self, other):
+        return self.due < other.due
+
 class Card:
-    def __init__(self, entries, comment):
+    def __init__(self, entries: List[Entry], comment: str) -> None:
         self.entries = entries
         self.comment = comment
         self.added = time.time()
 
-    def due_entry(self):
+    def due_entry(self) -> Entry:
         return min(self.entries)
 
     def due_at(self):
@@ -46,35 +62,20 @@ class Card:
     def __lt__(self, other):
         return self.due_at() < other.due_at()
 
-class Entry:
-    def __init__(self, text, proficiency=60, due=None):
-        self.text = text
-        self.proficiency = proficiency
-        if due:
-            self.due = due
-        else:
-            self.due = time.time() + 5 * 60 * random.random()
-
-    def __str__(self):
-        return self.text
-
-    def __lt__(self, other):
-        return self.due < other.due
-
 class Database:
-    def __init__(self, langs):
+    def __init__(self, langs: List[str]) -> None:
         self.langs = langs
-        self.cards = []
+        self.cards = []  # type: List[Card]
         self.changes = True
 
         self.retention = [1., 1.]
-        self.rethist = []
+        self.rethist = []  # type: List[List[float]]
 
-    def load(filename):
+    def load(filename: str):
         with open(filename, "r") as dbfile:
             return Database.from_dict(json.load(dbfile))
 
-    def save(self, filename):
+    def save(self, filename: str):
         with open(filename, "w") as dbfile:
             json.dump(self, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
 
@@ -102,7 +103,7 @@ class Database:
                             entry.due += off
         return db
 
-    def add(self, card):
+    def add(self, card: Card):
         self.changes = True
         heapq.heappush(self.cards, card)
 
@@ -183,7 +184,7 @@ def main():
         save(db)
 
 
-def add_card(db):
+def add_card(db: Database):
     try:
         entries = []
         for lang in db.langs:
@@ -210,7 +211,7 @@ def multiline_input():
     return res
 
 
-def remove_card(db):
+def remove_card(db: Database):
     content = input("Enter card to remove: ")
     for card in db.cards:
         if content in [e.text for e in card.entries]:
@@ -220,12 +221,12 @@ def remove_card(db):
             db.changes = True
             break
 
-def learn(db):
+def learn(db: Database):
     if not db.cards or not db.top().is_due():
         print("No cards to learn")
         return
 
-    duration = 0
+    duration = 0.
     while True:
         try:
             duration = float(input("Duration (min): "))
@@ -264,7 +265,7 @@ def learn(db):
             break
 
 
-def ask_yes_no(question, exact=True, default=True):
+def ask_yes_no(question: str, exact: bool = True, default: bool = True):
     while True:
         print(question, end=" ")
         if exact:
@@ -280,7 +281,7 @@ def ask_yes_no(question, exact=True, default=True):
         elif not exact and answer is "": return default
 
 
-def find(db):
+def find(db: Database):
     prog = None
     try:
         prog = re.compile(".*" + input("Seach for: "))
@@ -293,7 +294,7 @@ def find(db):
             print(time.asctime(time.localtime(card.due_at())), card)
 
 
-def stats(db):
+def stats(db: Database):
     print("Total:", len(db.cards))
 
     print("Retention score:", 100 * db.retention[0]/db.retention[1])
@@ -305,7 +306,7 @@ def stats(db):
     #print("Cards due:", n)
 
 
-def save(db):
+def save(db: Database):
     if not db.changes:
         print("No changes to be saved")
         return
