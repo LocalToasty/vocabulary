@@ -7,36 +7,13 @@ import json
 import time
 import heapq
 import re
+from math import log
+from typing import List
 
 path = ""
 
-class Card:
-    def __init__(self, entries, comment):
-        self.entries = entries
-        self.comment = comment
-
-    def due_entry(self):
-        return min(self.entries)
-
-    def due_at(self):
-        return min([entry.due for entry in self.entries])
-
-    def is_due(self):
-        return time.time() >= self.due_at()
-
-    def __str__(self):
-        res = str(self.entries[0])
-        for e in self.entries[1:]:
-            res += " \t" + str(e)
-        if self.comment:
-            res += " \t# " + self.comment
-        return res
-
-    def __lt__(self, other):
-        return self.due_at() < other.due_at()
-
 class Entry:
-    def __init__(self, text, proficiency=1, due=None):
+    def __init__(self, text: str, proficiency: float = 60, due: float = None) -> None:
         self.text = text
         self.proficiency = proficiency
         if due:
@@ -50,28 +27,83 @@ class Entry:
     def __lt__(self, other):
         return self.due < other.due
 
+class Card:
+    def __init__(self, entries: List[Entry], comment: str) -> None:
+        self.entries = entries
+        self.comment = comment
+        self.added = time.time()
+
+    def due_entry(self) -> Entry:
+        return min(self.entries)
+
+    def due_at(self):
+        return min([entry.due for entry in self.entries])
+
+    def is_due(self):
+        return time.time() >= self.due_at()
+
+    def print(self):
+        for e in self.entries:
+            print(e)
+        if self.comment:
+            print(self.comment)
+
+    def __str__(self):
+        res = str(self.entries[0])
+        for e in self.entries[1:]:
+            res += " \t" + str(e)
+        if self.comment:
+            res += " \t# " + self.comment
+        return res
+
+    def __repr__(self):
+        return str(self)
+
+    def __lt__(self, other):
+        return self.due_at() < other.due_at()
+
 class Database:
-    def __init__(self, langs):
+    def __init__(self, langs: List[str]) -> None:
         self.langs = langs
-        self.cards = []
-        self.changes = False
+        self.cards = []  # type: List[Card]
+        self.changes = True
 
         self.retention = [1., 1.]
+        self.rethist = []  # type: List[List[float]]
+
+    def load(filename: str):
+        with open(filename, "r") as dbfile:
+            return Database.from_dict(json.load(dbfile))
+
+    def save(self, filename: str):
+        with open(filename, "w") as dbfile:
+            json.dump(self, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
 
     def from_dict(dct):
         db = Database(dct["langs"])
+        db.changes = False
         db.retention = dct["retention"]
-        n = 0
+        if "rethist" in dct: db.rethist = dct["rethist"]
         for c in dct["cards"]:
-            n += 1
             card = Card([Entry(e["text"], e["proficiency"], e["due"])
                          for e in c["entries"]],
                         c["comment"])
+            if "added" in c:
+                card.added = c["added"]
             db.cards.append(card)
         heapq.heapify(db.cards)
+
+        if len(db.cards) > 64:
+            cards = heapq.nsmallest(64, db.cards)
+            if cards[-1].is_due():
+                off = time.time() - cards[-1].due_at()
+                for card in db.cards:
+                    for entry in card.entries:
+                        if entry.due > cards[-1].due_at():
+                            entry.due += off
         return db
 
-    def add(self, card):
+    def add(self, card: Card):
         self.changes = True
         heapq.heappush(self.cards, card)
 
@@ -87,14 +119,17 @@ class DatabaseEncoder(json.JSONEncoder):
         return {
             "langs": db.langs,
             "retention": db.retention,
-            "cards": [{
+            "rethist": db.rethist,
+            "cards": sorted([{
                 "entries": [{
                     "text": entry.text,
                     "proficiency": entry.proficiency,
                     "due": entry.due
                 } for entry in card.entries],
+                "added": card.added,
                 "comment": card.comment,
-            } for card in db.cards]
+            } for card in db.cards],
+                            key=lambda x: x['added'])
         }
 
 
@@ -108,8 +143,7 @@ def main():
 
     db = None
     try:
-        with open(sys.argv[1], "r") as dbfile:
-            db = Database.from_dict(json.load(dbfile))
+        db = Database.load(path)
     except FileNotFoundError:
         n = int(input("How many entries per card? "))
         langs = []
@@ -146,20 +180,18 @@ def main():
             pass
 
     print()
-    if db.changes and ask_yes_no("Save changes?", default=True):
+    if db.changes and ask_yes_no("Save changes?", exact=False, default=True):
         save(db)
 
-    if db.cards:
-        print("Come back on",
-              time.asctime(time.localtime(max(time.time(),
-                                              heapq.nsmallest(min(16, len(db.cards)), db.cards)[-1].due_at()))))
 
-def add_card(db):
+def add_card(db: Database):
     try:
         entries = []
         for lang in db.langs:
-            entry = Entry(input(lang + ": "))
-            entries.append(entry)
+            text = input(lang + ": ")
+            if text == '"""':
+                text = multiline_input()
+            entries.append(Entry(text))
 
         comment = input("Comment: ")
         db.add(Card(entries, comment))
@@ -168,21 +200,33 @@ def add_card(db):
         print()
         return None
 
-def remove_card(db):
+
+def multiline_input():
+    inp = input()
+    res = ""
+    while inp != '"""':
+        res += inp + "\n"
+        inp = input()
+
+    return res
+
+
+def remove_card(db: Database):
     content = input("Enter card to remove: ")
     for card in db.cards:
         if content in [e.text for e in card.entries]:
             print("Removed {}".format(card))
             db.cards.remove(card)
             heapq.heapify(db.cards)
+            db.changes = True
             break
 
-def learn(db):
+def learn(db: Database):
     if not db.cards or not db.top().is_due():
         print("No cards to learn")
         return
 
-    duration = 0
+    duration = 0.
     while True:
         try:
             duration = float(input("Duration (min): "))
@@ -192,27 +236,28 @@ def learn(db):
 
     end_time = time.time() + duration * 60
 
-    # clear screen
-    print(chr(27) + "[2J")
-
     while time.time() < end_time:
         if not db.top().is_due():
-            print("Next cards ready on", time.asctime(time.localtime(db.top().due_at())))
-            break
+            return
 
         try:
             card = db.pop()
             entry = card.due_entry()
+
+            print(chr(27) + "[2J")
             print(entry, end=" ")
             input()
-            print(card)
+            print(chr(27) + "[2J")
+            card.print()
 
+            correct = ask_yes_no("Correct?")
             db.retention[1] += entry.proficiency
-            if ask_yes_no("Correct?", default=False):
+            if correct:
                 db.retention[0] += entry.proficiency
-                entry.proficiency = entry.proficiency * 2 + 0.2 * random.random() * (time.time() - entry.due)
+                entry.proficiency = entry.proficiency * 2 + random.random() * 3600 * log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
             else:
-                entry.proficiency = max(entry.proficiency / 128, 1)
+                entry.proficiency = max(entry.proficiency / 16, 60.)
+                db.retention[0] += entry.proficiency
             entry.due = time.time() + entry.proficiency
             db.add(card)
         except (KeyboardInterrupt, EOFError):
@@ -220,19 +265,23 @@ def learn(db):
             break
 
 
-def ask_yes_no(question, default):
-    print(question, end=" ")
-    if default:
-        print("[Y/n]: ", end="")
-    else:
-        print("[y/N]: ", end="")
-    answer = input()
-    if answer in ["y", "Y"]: return True
-    elif answer in ["n", "N"]: return False
-    else: return default
+def ask_yes_no(question: str, exact: bool = True, default: bool = True):
+    while True:
+        print(question, end=" ")
+        if exact:
+            print("[y/n]: ", end="")
+        elif default:
+            print("[Y/n]: ", end="")
+        else:
+            print("[y/N]: ", end="")
+
+        answer = input()
+        if answer in ["y", "Y"]: return True
+        elif answer in ["n", "N"]: return False
+        elif not exact and answer is "": return default
 
 
-def find(db):
+def find(db: Database):
     prog = None
     try:
         prog = re.compile(".*" + input("Seach for: "))
@@ -245,32 +294,19 @@ def find(db):
             print(time.asctime(time.localtime(card.due_at())), card)
 
 
-def stats(db):
+def stats(db: Database):
     print("Total:", len(db.cards))
 
-    print("Retention score:", int(1000 * db.retention[0]/db.retention[1]))
+    print("Retention score:", 100 * db.retention[0]/db.retention[1])
 
-    cards = db.cards.copy()
-    print("Cards Due:")
-    n = 0
-    while cards and heapq.heappop(cards).is_due():
-        n += 1
-    print("  Now:          ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 6*60*60:
-        n += 1
-    print("  In six hours: ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 24*60*60:
-        n += 1
-    print("  Tomorrow:     ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 2*24*60*60:
-        n += 1
-    print("  In two days:  ", n)
-    while cards and heapq.heappop(cards).due_at() <= time.time() + 3*24*60*60:
-        n += 1
-    print("  In three days:", n)
+    #cards = db.cards.copy()
+    #n = 0
+    #while cards and heapq.heappop(cards).is_due():
+    #    n += 1
+    #print("Cards due:", n)
 
 
-def save(db):
+def save(db: Database):
     if not db.changes:
         print("No changes to be saved")
         return
@@ -285,8 +321,10 @@ def save(db):
             else:
                 path = input("Save as: ")
 
-            with open(path, "w") as dbfile:
-                json.dump(db, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
+            if db.rethist and db.rethist[-1][0] + 60*60 < time.time():
+                db.rethist += [[time.time(), db.retention[0]/db.retention[1]]]
+
+            db.save(path)
             break
         except FileNotFoundError:
             pass
