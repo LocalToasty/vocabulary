@@ -78,6 +78,7 @@ class Database:
     def save(self, filename: str):
         with open(filename, "w") as dbfile:
             json.dump(self, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
+        self.changes = False
 
     def from_dict(dct):
         db = Database(dct["langs"])
