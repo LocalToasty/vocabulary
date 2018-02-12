@@ -8,7 +8,7 @@ import time
 import heapq
 import re
 from math import log
-from typing import List
+from typing import List, Iterable, Union
 
 path = ""
 
@@ -104,9 +104,14 @@ class Database:
                             entry.due += off
         return db
 
-    def add(self, card: Card):
+    def add(self, cards: Union[Card, Iterable[Card]]):
+        heapq.heappush(self.cards, cards)
         self.changes = True
-        heapq.heappush(self.cards, card)
+
+    def remove(self, cards: Union[Card, Iterable[Card]]):
+        db.cards.remove(card)
+        heapq.heapify(db.cards)
+        self.changes = True
 
     def pop(self):
         self.changes = True

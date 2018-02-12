@@ -4,6 +4,7 @@ import sys
 import random
 import time
 import re
+import heapq
 from datetime import datetime
 from math import log
 import vocabulary as vocab
@@ -57,28 +58,35 @@ class VocabularyApp(QMainWindow):
         filemenu.addAction(self.save_as_action)
         filemenu.addAction(quit_action)
 
-        self.search_field = QLineEdit()
-        # self.search_field.textEdited.connect(self.update_vocab)
+        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setFilterKeyColumn(-1)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.proxy_model.setSourceModel(self.db_model)
 
-        vocab_view = QTableView()
-        proxy_model = QSortFilterProxyModel()
-        proxy_model.setSourceModel(self.db_model)
-        vocab_view.setModel(proxy_model)
-        vocab_view.setSortingEnabled(True)
+        self.vocab_view = QTableView()
+        self.vocab_view.setSortingEnabled(True)
+        self.vocab_view.setModel(self.proxy_model)
+
+        self.search_field = QLineEdit()
+        self.search_field.textEdited.connect(self.proxy_model.setFilterRegExp)
 
         add_button = QPushButton('&Add')
         add_button.clicked.connect(self.add)
+
+        remove_button = QPushButton('&Remove')
+        remove_button.clicked.connect(self.remove)
 
         learn_button = QPushButton('&Learn')
         learn_button.clicked.connect(self.learn)
 
         buttons = QVBoxLayout()
         buttons.addWidget(add_button)
+        buttons.addWidget(remove_button)
         buttons.addWidget(learn_button)
         buttons.addStretch(1)
 
         buttons_and_vocab = QHBoxLayout()
-        buttons_and_vocab.addWidget(vocab_view)
+        buttons_and_vocab.addWidget(self.vocab_view)
         buttons_and_vocab.addLayout(buttons)
 
         layout = QVBoxLayout()
@@ -149,6 +157,15 @@ class VocabularyApp(QMainWindow):
         if d.exec_():
             self.db_model.add(d.card)
 
+    def remove(self, event):
+        index_list = []
+        for model_index in self.vocab_view.selectionModel().selectedIndexes():
+            index = QPersistentModelIndex(model_index)
+            index_list.append(index)
+
+        for index in index_list:
+            self.proxy_model.removeRow(index.row())
+
     def learn(self, event):
         if not self.db.cards or not self.db.top().is_due():
             QMessageBox.information(self, 'No Cards to Learn',
@@ -156,7 +173,7 @@ class VocabularyApp(QMainWindow):
             return
 
         LearnDialog(self.db, self).exec_()
-        self.db_model.layoutChanged.emit()
+        self.proxy_model.setSourceModel(self.db_model) # HACK
 
     @property
     def db(self):
@@ -209,7 +226,7 @@ class NewDatabaseDialog(QDialog):
             pass  # TODO
 
     def make_database(self):
-        self.db_model.db = vocab.Database(
+        self.db = vocab.Database(
             [lang.text() for lang in self.langs[:self.langno.value()]])
 
         self.accept()
@@ -325,10 +342,12 @@ class DatabaseModel(QAbstractTableModel):
         card = self._db.cards[index.row()]
 
         if role == Qt.EditRole:
-            if index.column() < len(self._db.langs):
+            if index.column() < len(self._db.langs) and card.entries[index.column()].text != value:
                 card.entries[index.column()].text = value
-            elif index.column() == len(self._db.langs):
+                self._db.changes = True
+            elif index.column() == len(self._db.langs) and card.comment != value:
                 card.comment = value
+                self._db.changes = True
 
             self.dataChanged.emit(index, index)
             return True
@@ -339,9 +358,19 @@ class DatabaseModel(QAbstractTableModel):
         card = self._db.cards[index.row()]
 
         if index.column() <= len(self._db.langs):  # includes comment field
-            return Qt.ItemIsEditable | Qt.ItemIsEnabled
+            return Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
         else:
-            return Qt.ItemIsEnabled
+            return Qt.ItemIsSelectable | Qt.ItemIsEnabled
+
+    def removeRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()):
+        self.beginRemoveRows(parent, row, row + count - 1)
+
+        del self._db.cards[row:row+count]
+        self._db.changes = True
+        heapq.heapify(self._db.cards)
+
+        self.endRemoveRows()
+        return True
 
     @property
     def db(self):
