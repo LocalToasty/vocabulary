@@ -162,7 +162,7 @@ class VocabularyApp(QMainWindow):
 
 
 class NewDatabaseDialog(QDialog):
-    def __init__(self, parent):
+    def __init__(self, parent: QObject = None):
         super().__init__(parent)
 
         self.setWindowTitle('Create New Database')
@@ -291,7 +291,7 @@ class DatabaseModel(QAbstractTableModel):
         if not self._db:
             return None
 
-        if role == Qt.DisplayRole:
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             card = self._db.cards[index.row()]
             if index.column() < len(self._db.langs):
                 return card.entries[index.column()].text
@@ -304,7 +304,7 @@ class DatabaseModel(QAbstractTableModel):
 
         return None
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int):
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int) -> Optional[str]:
         if not self._db or orientation == Qt.Vertical:
             return None
         
@@ -319,6 +319,28 @@ class DatabaseModel(QAbstractTableModel):
                 return 'Due'
 
         return None
+
+    def setData(self, index: QModelIndex, value, role: int) -> bool:
+        card = self._db.cards[index.row()]
+
+        if role == Qt.EditRole:
+            if index.column() < len(self._db.langs):
+                card.entries[index.column()].text = value
+            elif index.column() == len(self._db.langs):
+                card.comment = value
+            
+            self.dataChanged.emit(index, index)
+            return True
+
+        return False
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        card = self._db.cards[index.row()]
+
+        if index.column() <= len(self._db.langs):  # includes comment field
+            return Qt.ItemIsEditable | Qt.ItemIsEnabled
+        else:
+            return Qt.ItemIsEnabled
 
     @property
     def db(self):
