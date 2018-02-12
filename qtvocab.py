@@ -58,7 +58,7 @@ class VocabularyApp(QMainWindow):
         filemenu.addAction(quit_action)
 
         self.search_field = QLineEdit()
-        #self.search_field.textEdited.connect(self.update_vocab)
+        # self.search_field.textEdited.connect(self.update_vocab)
 
         vocab_view = QTableView()
         proxy_model = QSortFilterProxyModel()
@@ -100,7 +100,7 @@ class VocabularyApp(QMainWindow):
     def load_db(self):
         if not self.filename:
             return
-        
+
         self.db_model.load(self.filename)
         self.enable_view()
 
@@ -109,8 +109,9 @@ class VocabularyApp(QMainWindow):
         self.save_action.setEnabled(True)
         self.save_as_action.setEnabled(True)
 
-    def open(self, filename:str = ''):
-        filename = QFileDialog.getOpenFileName(self, 'Open Vocabulary Database', '', 'JSON files (*.json);;All Files (*)')[0]
+    def open(self, filename: str = ''):
+        filename = QFileDialog.getOpenFileName(
+            self, 'Open Vocabulary Database', '', 'JSON files (*.json);;All Files (*)')[0]
         if filename:
             self.filename = filename
             self.load_db()
@@ -123,7 +124,8 @@ class VocabularyApp(QMainWindow):
             return True
 
     def save_as(self):
-        filename = QFileDialog.getSaveFileName(self, 'Save Vocabulary Database As', 'vocabulary.json', 'JSON file (*.json)')[0]
+        filename = QFileDialog.getSaveFileName(
+            self, 'Save Vocabulary Database As', 'vocabulary.json', 'JSON file (*.json)')[0]
         if filename:
             self.filename = filename
             self.db.save(filename)
@@ -167,7 +169,6 @@ class NewDatabaseDialog(QDialog):
 
         self.setWindowTitle('Create New Database')
 
-
         label = QLabel('Number of sides:')
         self.langno = langno = QSpinBox()
         langno.valueChanged.connect(self.change_language_no)
@@ -205,11 +206,11 @@ class NewDatabaseDialog(QDialog):
                 self.langs += [QLineEdit()]
                 self.lang_layout.addWidget(self.langs[-1])
         elif no < len(self.langs):
-            pass #TODO
-
+            pass  # TODO
 
     def make_database(self):
-        self.db_model.db = vocab.Database([lang.text() for lang in self.langs[:self.langno.value()]])
+        self.db_model.db = vocab.Database(
+            [lang.text() for lang in self.langs[:self.langno.value()]])
 
         self.accept()
 
@@ -307,7 +308,7 @@ class DatabaseModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int) -> Optional[str]:
         if not self._db or orientation == Qt.Vertical:
             return None
-        
+
         if role == Qt.DisplayRole:
             if section < len(self._db.langs):
                 return self._db.langs[section]
@@ -328,7 +329,7 @@ class DatabaseModel(QAbstractTableModel):
                 card.entries[index.column()].text = value
             elif index.column() == len(self._db.langs):
                 card.comment = value
-            
+
             self.dataChanged.emit(index, index)
             return True
 
@@ -397,7 +398,7 @@ class LearnDialog(QDialog):
         if not self.db.top().is_due():
             self.accept()
             return
-        
+
         self.correct_label.hide()
         self.yes_button.hide()
         self.no_button.hide()
@@ -418,7 +419,7 @@ class LearnDialog(QDialog):
         self.yes_button.show()
         self.yes_button.setFocus(True)
         self.no_button.show()
-        
+
         self.entries[-1].setText(self.card.comment)
         for i, entry in enumerate(self.card.entries):
             self.entries[i].setText(entry.text)
@@ -426,7 +427,9 @@ class LearnDialog(QDialog):
     def correct(self):
         self.db.retention[1] += self.entry.proficiency
         self.db.retention[0] += self.entry.proficiency
-        self.entry.proficiency = self.entry.proficiency * 2 + random.random() * 3600 * log((time.time() - self.entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
+        self.entry.proficiency = self.entry.proficiency * 2 + random.random() * 3600 * \
+            log((time.time() - self.entry.due)/3600 *
+                0.125 + 1) * 24 / log(24*0.125 + 1)
         self.entry.due = time.time() + self.entry.proficiency
         self.put_back_card()
         self.next_card()
@@ -444,11 +447,13 @@ class LearnDialog(QDialog):
             self.db.add(self.card)
             self.card = None
 
+
 def arg_min(xs):
     mx = xs[0]
     mi = 0
     for i, x in enumerate(xs[1:]):
-        if x < mx: mx, mi = x, i+1
+        if x < mx:
+            mx, mi = x, i+1
 
     return mi
 
