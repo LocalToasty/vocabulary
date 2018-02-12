@@ -8,16 +8,23 @@ from datetime import datetime
 from math import log
 import vocabulary as vocab
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIcon, QKeySequence
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
 from typing import List, Optional
+
 
 class VocabularyApp(QMainWindow):
     def __init__(self, filename: str = '') -> None:
         super().__init__()
 
         self.filename = filename
+        self.db_model = DatabaseModel()
+
         self.init_ui()
         self.load_db()
+
+        if self.db:
+            self.enable_view()
 
     def init_ui(self) -> None:
         new_action = QAction('&New', self)
@@ -51,13 +58,13 @@ class VocabularyApp(QMainWindow):
         filemenu.addAction(quit_action)
 
         self.search_field = QLineEdit()
-        self.search_field.textEdited.connect(self.update_vocab)
+        #self.search_field.textEdited.connect(self.update_vocab)
 
-        self.vocab_table = QTableWidget()
-        self.vocab_table.cellClicked.connect(self.update_current_card)
-        current_card = None
-
-        self.vocab_table.verticalHeader().hide()
+        vocab_view = QTableView()
+        proxy_model = QSortFilterProxyModel()
+        proxy_model.setSourceModel(self.db_model)
+        vocab_view.setModel(proxy_model)
+        vocab_view.setSortingEnabled(True)
 
         add_button = QPushButton('&Add')
         add_button.clicked.connect(self.add)
@@ -71,7 +78,7 @@ class VocabularyApp(QMainWindow):
         buttons.addStretch(1)
 
         buttons_and_vocab = QHBoxLayout()
-        buttons_and_vocab.addWidget(self.vocab_table)
+        buttons_and_vocab.addWidget(vocab_view)
         buttons_and_vocab.addLayout(buttons)
 
         layout = QVBoxLayout()
@@ -85,74 +92,25 @@ class VocabularyApp(QMainWindow):
         self.setWindowTitle('Vocabulary')
         self.show()
 
-
     def new(self):
         d = NewDatabaseDialog(self)
         if d.exec_():
             self.db = d.db
-            self.setup_view()
-
 
     def load_db(self):
         if not self.filename:
-            self.db = None
             return
         
-        self.db = vocab.Database.load(self.filename)
-
-        self.setup_view()
-
-
-    def setup_view(self):
-        cols = len(self.db.langs) + 3
-        self.vocab_table.setColumnCount(cols)
-        self.vocab_table.setHorizontalHeaderLabels(self.db.langs + ["Comment", "Added", "Due"])
-
+        self.db_model.load(self.filename)
         self.enable_view()
 
-
     def enable_view(self):
-        self.vocab_table.sortItems(len(self.db.langs) + 1, 1)
-
-        self.refresh_view()
-
         self.main_widget.setEnabled(True)
         self.save_action.setEnabled(True)
         self.save_as_action.setEnabled(True)
 
-
-    def refresh_view(self):
-        self.update_vocab(self.search_field.text())
-        
-
-    def update_vocab(self, query=''):
-        self.vocab_table.setSortingEnabled(False)
-        cards = []
-
-        try:
-            regex = re.compile('.*' + query)
-        except re.error as e:
-            return
-    
-        for card in self.db.cards:
-            if any(regex.match(entry.text) for entry in card.entries) or regex.match(card.comment):
-                cards += [card]
-
-        self.vocab_table.setRowCount(len(cards))
-
-        for row, card in enumerate(cards):
-            self.vocab_table.setItem(row, len(self.db.langs), QTableWidgetItem(card.comment))
-            self.vocab_table.setItem(row, len(self.db.langs) + 1, QTableWidgetItem(datetime.fromtimestamp(card.added).isoformat(' ', 'minutes')))
-            self.vocab_table.setItem(row, len(self.db.langs) + 2, QTableWidgetItem(datetime.fromtimestamp(card.due_at()).isoformat(' ', 'minutes')))
-
-            for col, entry in enumerate(card.entries):
-                self.vocab_table.setItem(row, col, QTableWidgetItem(entry.text))
-
-        self.vocab_table.setSortingEnabled(True)
-
-
     def open(self, filename:str = ''):
-        filename = QFileDialog.getOpenFileName(self, 'Open Vocabulary Database')[0]
+        filename = QFileDialog.getOpenFileName(self, 'Open Vocabulary Database', '', 'JSON files (*.json);;All Files (*)')[0]
         if filename:
             self.filename = filename
             self.load_db()
@@ -165,7 +123,7 @@ class VocabularyApp(QMainWindow):
             return True
 
     def save_as(self):
-        filename = QFileDialog.getSaveFileName(self, 'Save Vocabulary Database As')[0]
+        filename = QFileDialog.getSaveFileName(self, 'Save Vocabulary Database As', 'vocabulary.json', 'JSON file (*.json)')[0]
         if filename:
             self.filename = filename
             self.db.save(filename)
@@ -187,9 +145,7 @@ class VocabularyApp(QMainWindow):
     def add(self, event):
         d = AddDialog(self)
         if d.exec_():
-            self.db.add(d.card)
-
-        self.refresh_view()
+            self.db_model.add(d.card)
 
     def learn(self, event):
         if not self.db.cards or not self.db.top().is_due():
@@ -197,18 +153,12 @@ class VocabularyApp(QMainWindow):
                                     'There are currently no cards to learn.')
             return
 
-        LearnDialog(self).exec_()
-        self.refresh_view()
+        LearnDialog(self.db, self).exec_()
+        self.db_model.layoutChanged.emit()
 
-    def update_current_card(self, x: int, y: int) -> None:
-        pass
-
-
-def find_closest(entries: List[str], db: vocab.Database) -> Optional[vocab.Card]:
-    for card in db.cards:
-        if all([entries[i] == card.entries[i].text]):
-            return card
-    return None
+    @property
+    def db(self):
+        return self.db_model.db
 
 
 class NewDatabaseDialog(QDialog):
@@ -249,7 +199,6 @@ class NewDatabaseDialog(QDialog):
 
         self.setLayout(layout)
 
-
     def change_language_no(self, no):
         if no > len(self.langs):
             for i in range(no - len(self.langs)):
@@ -260,7 +209,7 @@ class NewDatabaseDialog(QDialog):
 
 
     def make_database(self):
-        self.db = vocab.Database([lang.text() for lang in self.langs[:self.langno.value()]])
+        self.db_model.db = vocab.Database([lang.text() for lang in self.langs[:self.langno.value()]])
 
         self.accept()
 
@@ -275,7 +224,7 @@ class AddDialog(QDialog):
 
         self.entries = []
 
-        for row, lang in enumerate(parent.db.langs + ["Comment"]):
+        for row, lang in enumerate(parent.db_model.db.langs + ["Comment"]):
             entry_layout.addWidget(QLabel(lang + ':'), row, 0)
             self.entries += [QLineEdit(self)]
             entry_layout.addWidget(self.entries[-1], row, 1)
@@ -309,11 +258,78 @@ class AddDialog(QDialog):
         self.accept()
 
 
+class DatabaseModel(QAbstractTableModel):
+    def __init__(self, db: vocab.Database=None, parent: QObject = None) -> None:
+        super().__init__(parent)
+        self._db = db
+
+    def add(self, card: vocab.Card) -> None:
+        self._db.add(card)
+        self.layoutChanged.emit()
+
+    def remove(self, card: vocab.Card) -> None:
+        self._db.remove(card)
+        self.layoutChanged.emit()
+
+    def rowCount(self, parent: QModelIndex) -> int:
+        if self._db:
+            return len(self._db.cards)
+        else:
+            return 0
+
+    def columnCount(self, parent: QModelIndex) -> int:
+        if self._db:
+            return len(self._db.langs) + 3   # 3 ^= comment, added, due
+        else:
+            return 0
+
+    def load(self, filename: str) -> None:
+        self._db = vocab.Database.load(filename)
+        self.layoutChanged.emit()
+
+    def data(self, index: QModelIndex, role: int):
+        if not self._db:
+            return None
+
+        if role == Qt.DisplayRole:
+            card = self._db.cards[index.row()]
+            if index.column() < len(self._db.langs):
+                return card.entries[index.column()].text
+            elif index.column() == len(self._db.langs):
+                return card.comment
+            elif index.column() == len(self._db.langs) + 1:
+                return datetime.fromtimestamp(card.added).isoformat(' ', 'minutes')
+            elif index.column() == len(self._db.langs) + 2:
+                return datetime.fromtimestamp(card.due_at()).isoformat(' ', 'minutes')
+
+        return None
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int):
+        if not self._db or orientation == Qt.Vertical:
+            return None
+        
+        if role == Qt.DisplayRole:
+            if section < len(self._db.langs):
+                return self._db.langs[section]
+            elif section == len(self._db.langs):
+                return 'Comment'
+            elif section == len(self._db.langs) + 1:
+                return 'Added'
+            elif section == len(self._db.langs) + 2:
+                return 'Due'
+
+        return None
+
+    @property
+    def db(self):
+        return self._db
+
+
 class LearnDialog(QDialog):
-    def __init__(self, parent):
+    def __init__(self, db: vocab.Database, parent: QObject = None) -> None:
         super().__init__(parent)
 
-        self.db = parent.db
+        self.db = db
 
         self.setWindowTitle('Learn')
 
@@ -356,7 +372,9 @@ class LearnDialog(QDialog):
         self.next_card()
 
     def next_card(self):
-        if not self.db.top().is_due(): self.accept()
+        if not self.db.top().is_due():
+            self.accept()
+            return
         
         self.correct_label.hide()
         self.yes_button.hide()
@@ -400,8 +418,9 @@ class LearnDialog(QDialog):
         self.next_card()
 
     def put_back_card(self):
-        self.db.add(self.card)
-
+        if self.card:
+            self.db.add(self.card)
+            self.card = None
 
 def arg_min(xs):
     mx = xs[0]
@@ -416,7 +435,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     filename = ''
-    if sys.argv[1]:
+    if len(sys.argv) > 1:
         filename = sys.argv[1]
 
     vocab_app = VocabularyApp(filename)
