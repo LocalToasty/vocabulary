@@ -3,7 +3,6 @@
 import sys
 import random
 import time
-import re
 import heapq
 from datetime import datetime
 from math import log
@@ -11,7 +10,7 @@ import vocabulary as vocab
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-from typing import List, Optional
+from typing import Optional
 
 
 class VocabularyApp(QMainWindow):
@@ -386,6 +385,7 @@ class LearnDialog(QDialog):
         self.setWindowTitle('Learn')
 
         entry_layout = QGridLayout()
+        entry_layout.setColumnStretch(2, 1)
 
         self.entries = []
 
