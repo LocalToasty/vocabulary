@@ -23,9 +23,6 @@ class VocabularyApp(QMainWindow):
         self.init_ui()
         self.load_db()
 
-        if self.db:
-            self.enable_view()
-
     def init_ui(self) -> None:
         new_action = QAction('&New', self)
         new_action.setShortcuts(QKeySequence.New)
@@ -97,6 +94,7 @@ class VocabularyApp(QMainWindow):
         self.main_widget.setEnabled(False)
         self.setCentralWidget(self.main_widget)
         self.setWindowTitle('Vocabulary')
+        self.resize(1024, 786)
         self.show()
 
     def new(self):
@@ -109,9 +107,9 @@ class VocabularyApp(QMainWindow):
             return
 
         self.db_model.load(self.filename)
-        self.enable_view()
 
-    def enable_view(self):
+        # set up view
+        self.vocab_view.resizeColumnsToContents()
         self.main_widget.setEnabled(True)
         self.save_action.setEnabled(True)
         self.save_as_action.setEnabled(True)
@@ -158,7 +156,7 @@ class VocabularyApp(QMainWindow):
 
     def remove(self, event):
         index_list = []
-        for model_index in self.vocab_view.selectionModel().selectedIndexes():
+        for model_index in self.vocab_view.selectionModel().selectedRows():
             index = QPersistentModelIndex(model_index)
             index_list.append(index)
 
@@ -322,10 +320,12 @@ class DatabaseModel(QAbstractTableModel):
         return None
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int) -> Optional[str]:
-        if not self._db or orientation == Qt.Vertical:
+        if not self._db:
             return None
 
         if role == Qt.DisplayRole:
+            if orientation == Qt.Vertical:
+                return '  '
             if section < len(self._db.langs):
                 return self._db.langs[section]
             elif section == len(self._db.langs):
