@@ -4,6 +4,8 @@ import sys
 import random
 import time
 import heapq
+import csv
+import io
 from datetime import datetime
 from math import log
 import vocabulary as vocab
@@ -24,6 +26,15 @@ class VocabularyApp(QMainWindow):
         self.load_db()
 
     def init_ui(self) -> None:
+        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setFilterKeyColumn(-1)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.proxy_model.setSourceModel(self.db_model)
+
+        self.vocab_view = VocabView()
+        self.vocab_view.setSortingEnabled(True)
+        self.vocab_view.setModel(self.proxy_model)
+
         new_action = QAction('&New', self)
         new_action.setShortcuts(QKeySequence.New)
         new_action.triggered.connect(self.new)
@@ -46,7 +57,16 @@ class VocabularyApp(QMainWindow):
         quit_action.setShortcuts(QKeySequence.Quit)
         quit_action.triggered.connect(self.close)
 
+        copy_action = QAction('&Copy', self)
+        copy_action.setShortcuts(QKeySequence.Copy)
+        copy_action.triggered.connect(self.vocab_view.copy)
+
+        select_all_action = QAction('Select &All', self)
+        select_all_action.setShortcuts(QKeySequence.SelectAll)
+        select_all_action.triggered.connect(self.vocab_view.selectAll)
+
         menubar = self.menuBar()
+
         filemenu = menubar.addMenu('&File')
         filemenu.addAction(new_action)
         filemenu.addAction(open_action)
@@ -54,14 +74,9 @@ class VocabularyApp(QMainWindow):
         filemenu.addAction(self.save_as_action)
         filemenu.addAction(quit_action)
 
-        self.proxy_model = QSortFilterProxyModel()
-        self.proxy_model.setFilterKeyColumn(-1)
-        self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        self.proxy_model.setSourceModel(self.db_model)
-
-        self.vocab_view = QTableView()
-        self.vocab_view.setSortingEnabled(True)
-        self.vocab_view.setModel(self.proxy_model)
+        filemenu = menubar.addMenu('&Edit')
+        filemenu.addAction(copy_action)
+        filemenu.addAction(select_all_action)
 
         self.search_field = QLineEdit()
         self.search_field.textEdited.connect(self.proxy_model.setFilterRegExp)
@@ -70,7 +85,7 @@ class VocabularyApp(QMainWindow):
         add_button.clicked.connect(self.add)
 
         remove_button = QPushButton('&Remove')
-        remove_button.clicked.connect(self.remove)
+        remove_button.clicked.connect(self.vocab_view.remove)
 
         learn_button = QPushButton('&Learn')
         learn_button.clicked.connect(self.learn)
@@ -153,15 +168,6 @@ class VocabularyApp(QMainWindow):
         d = AddDialog(self)
         if d.exec_():
             self.db_model.add(d.card)
-
-    def remove(self, event):
-        index_list = []
-        for model_index in self.vocab_view.selectionModel().selectedRows():
-            index = QPersistentModelIndex(model_index)
-            index_list.append(index)
-
-        for index in index_list:
-            self.proxy_model.removeRow(index.row())
 
     def learn(self, event):
         if not self.db.cards or not self.db.top().is_due():
@@ -374,6 +380,46 @@ class DatabaseModel(QAbstractTableModel):
     @property
     def db(self):
         return self._db
+
+
+class VocabView(QTableView):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        selected_rows = self.selectionModel().selectedRows()
+        if selected_rows and event.key() == Qt.Key_Delete:
+            self.remove()
+
+        elif self.selectedIndexes():
+            if event.key() == Qt.Key_Delete:
+                for index in self.selectedIndexes():
+                    self.model().setData(index, '')
+
+    def remove(self, event=None):
+        index_list = []
+        for model_index in self.selectionModel().selectedRows():
+            index = QPersistentModelIndex(model_index)
+            index_list.append(index)
+
+        for index in index_list:
+            self.model().removeRow(index.row())
+
+    def copy(self):
+        out = io.StringIO()
+        writer = csv.writer(out, delimiter='\t')
+
+        row_count = None
+        row = []
+
+        for index in self.selectedIndexes():
+            if row_count != index.row():
+                row_count = index.row()
+                if row:
+                    writer.writerow(row)
+                    row = []
+
+            row.append(self.model().data(index))
+
+        writer.writerow(row)
+        QApplication.clipboard().setText(out.getvalue())
 
 
 class LearnDialog(QDialog):
