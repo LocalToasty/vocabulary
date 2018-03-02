@@ -101,6 +101,7 @@ class VocabularyApp:
                 pass
     
         end_time = time.time() + duration * 60
+        i = 0
     
         while time.time() < end_time:
             if not self.db.top().is_due():
@@ -108,6 +109,7 @@ class VocabularyApp:
     
             try:
                 card = self.db.pop()
+                i += 1
                 entry = card.due_entry()
     
                 print(chr(27) + "[2J")
@@ -129,6 +131,7 @@ class VocabularyApp:
             except (KeyboardInterrupt, EOFError):
                 self.db.add(card)
                 break
+        print(i)
     
     def find(self) -> None:
         prog = None
