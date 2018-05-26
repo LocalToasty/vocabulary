@@ -109,7 +109,7 @@ class VocabularyApp(QMainWindow):
         self.main_widget.setEnabled(False)
         self.setCentralWidget(self.main_widget)
         self.setWindowTitle('Vocabulary')
-        self.resize(1024, 786)
+        self.resize(800, 600)
         self.show()
 
     def new(self):

@@ -72,11 +72,11 @@ class Database:
         self.rethist = []  # type: List[List[float]]
 
     def load(filename: str):
-        with open(filename, "r") as dbfile:
+        with open(filename, "r", encoding="UTF-8") as dbfile:
             return Database.from_dict(json.load(dbfile))
 
     def save(self, filename: str):
-        with open(filename, "w") as dbfile:
+        with open(filename, "w", encoding="UTF-8") as dbfile:
             json.dump(self, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
         self.changes = False
 
@@ -94,8 +94,8 @@ class Database:
             db.cards.append(card)
         heapq.heapify(db.cards)
 
-        if len(db.cards) > 64:
-            cards = heapq.nsmallest(64, db.cards)
+        if len(db.cards) > 52:
+            cards = heapq.nsmallest(52, db.cards)
             if cards[-1].is_due():
                 off = time.time() - cards[-1].due_at()
                 for card in db.cards:
