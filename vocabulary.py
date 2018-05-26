@@ -91,8 +91,8 @@ class Database:
             db.cards.append(card)
         heapq.heapify(db.cards)
 
-        if len(db.cards) > 56:
-            cards = heapq.nsmallest(56, db.cards)
+        if len(db.cards) > 36:
+            cards = heapq.nsmallest(36, db.cards)
             if cards[-1].is_due():
                 off = time.time() - cards[-1].due_at()
                 for card in db.cards:

@@ -101,6 +101,7 @@ class VocabularyApp:
                 pass
     
         end_time = time.time() + duration * 60
+        i = 0
     
         while time.time() < end_time:
             if not self.db.top().is_due():
@@ -108,6 +109,7 @@ class VocabularyApp:
     
             try:
                 card = self.db.pop()
+                i += 1
                 entry = card.due_entry()
     
                 print(chr(27) + "[2J")
@@ -120,15 +122,17 @@ class VocabularyApp:
                 self.db.retention[1] += entry.proficiency
                 if correct:
                     self.db.retention[0] += entry.proficiency
-                    entry.proficiency = entry.proficiency * 2 + random.random() * 3600 * log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
+                    entry.proficiency = 1.75 * entry.proficiency + random.random() * 3600 * log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
+                    entry.due = time.time() + entry.proficiency
                 else:
                     entry.proficiency = max(entry.proficiency / 16, 60.)
                     self.db.retention[0] += entry.proficiency
-                entry.due = time.time() + entry.proficiency
+                    entry.due = time.time() + 60
                 self.db.add(card)
             except (KeyboardInterrupt, EOFError):
                 self.db.add(card)
                 break
+        print(i)
     
     def find(self) -> None:
         prog = None
