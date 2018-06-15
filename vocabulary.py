@@ -8,6 +8,9 @@ import heapq
 from typing import List
 
 
+version = [2, 1, 0]
+
+
 class Entry:
     def __init__(self, text: str, proficiency: float = 60, due: float = None) -> None:
         self.text = text
@@ -78,6 +81,13 @@ class Database:
             json.dump(self, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
 
     def from_dict(dct):
+        global version
+        if "version" in dct and dct["version"] > version[:2]:
+            print("Warning: The loaded file was created with a newer version "
+                  "({} > {}). Saving might lead to data loss."
+                  .format(".".join(map(str, dct["version"])),
+                          ".".join(map(str, version))))
+
         db = Database(dct["langs"])
         db.changes = False
         db.retention = dct["retention"]
@@ -115,8 +125,10 @@ class Database:
 
 class DatabaseEncoder(json.JSONEncoder):
     def default(self, db):
+        global version
         return {
             "langs": db.langs,
+            "version": version[:2],
             "retention": db.retention,
             "rethist": db.rethist,
             "cards": sorted([{
