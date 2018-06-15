@@ -68,15 +68,15 @@ class VocabularyApp:
                 if text == '"""':
                     text = multiline_input()
                 entries.append(Entry(text))
-    
+
             comment = input("Comment: ")
             self.db.add(Card(entries, comment))
-    
+
         except (KeyboardInterrupt, EOFError):
             print()
             return
-    
-    
+
+
     def remove_card(self) -> None:
         content = input("Enter card to remove: ")
         for card in self.db.cards:
@@ -86,12 +86,12 @@ class VocabularyApp:
                 heapq.heapify(self.db.cards)
                 self.db.changes = True
                 break
-    
+
     def learn(self) -> None:
         if not self.db.cards or not self.db.top().is_due():
             print("No cards to learn")
             return
-    
+
         duration = 0.
         while True:
             try:
@@ -99,25 +99,25 @@ class VocabularyApp:
                 break
             except ValueError:
                 pass
-    
+
         end_time = time.time() + duration * 60
         i = 0
-    
+
         while time.time() < end_time:
             if not self.db.top().is_due():
                 return
-    
+
             try:
                 card = self.db.pop()
                 i += 1
                 entry = card.due_entry()
-    
+
                 print(chr(27) + "[2J")
                 print(entry, end=" ")
                 input()
                 print(chr(27) + "[2J")
                 card.print()
-    
+
                 correct = ask_yes_no("Correct?")
                 self.db.retention[1] += entry.proficiency
                 if correct:
@@ -133,7 +133,7 @@ class VocabularyApp:
                 self.db.add(card)
                 break
         print(i)
-    
+
     def find(self) -> None:
         prog = None
         try:
@@ -141,27 +141,27 @@ class VocabularyApp:
         except re.error as e:
             print("Error while compiling regular expression:", e.msg)
             return
-    
+
         for card in self.db.cards:
             if any(prog.match(entry.text) for entry in card.entries) or prog.match(card.comment):
                 print(time.asctime(time.localtime(card.due_at())), card)
-    
+
     def stats(self) -> None:
         print("Total:", len(self.db.cards))
-    
+
         print("Retention score:", 100 * self.db.retention[0]/self.db.retention[1])
-    
+
         #cards = self.db.cards.copy()
         #n = 0
         #while cards and heapq.heappop(cards).is_due():
         #    n += 1
         #print("Cards due:", n)
-    
+
     def save(self) -> None:
         if not self.db.changes:
             print("No changes to be saved")
             return
-    
+
         while True:
             try:
                 if self.path:
@@ -170,18 +170,18 @@ class VocabularyApp:
                         self.path = new_path
                 else:
                     self.path = input("Save as: ")
-    
+
                 if self.db.rethist and self.db.rethist[-1][0] + 60*60 < time.time():
                     self.db.rethist += [[time.time(), self.db.retention[0]/self.db.retention[1]]]
-    
+
                 self.db.save(self.path)
                 break
             except FileNotFoundError:
                 pass
-    
+
         self.db.changes = False
-    
-    
+
+
 def multiline_input() -> str:
     inp = input()
     res = ""
@@ -206,7 +206,7 @@ def ask_yes_no(question: str, exact: bool = True, default: bool = True) -> bool:
         if answer in ["y", "Y"]: return True
         elif answer in ["n", "N"]: return False
         elif not exact and answer is "": return default
-    
+
 
 if __name__ == "__main__":
     app = VocabularyApp()
