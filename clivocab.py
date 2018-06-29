@@ -7,6 +7,7 @@ import re
 from math import log
 from typing import Optional
 
+
 class VocabularyApp:
     def __init__(self) -> None:
         if len(sys.argv) != 2:
@@ -16,9 +17,9 @@ class VocabularyApp:
         global path
         self.path = sys.argv[1]
 
-
     def run(self) -> None:
-        self.db = None # type: Optional[Database]
+        self.db = None  # type: Optional[Database]
+        # Load database from file, or create new one if file does not exist
         try:
             self.db = Database.load(self.path)
         except FileNotFoundError:
@@ -28,41 +29,49 @@ class VocabularyApp:
                 langs.append(input("Name of entry {}: ".format(i)))
             self.db = Database(langs)
 
+        # check if any cards are ready
         if self.db.cards:
             if self.db.top().is_due():
                 print("Cards ready for repetition")
             else:
-                print("Next card ready on", time.asctime(time.localtime(self.db.top().due_at())))
+                print("Next card ready on",
+                      time.asctime(time.localtime(self.db.top().due_at())))
 
+        # main menu loop
         while True:
             try:
-                choice = input("> ")
+                command = input("> ")
             except (KeyboardInterrupt, EOFError):
+                # quit loop on ^C, ^D
                 break
 
             try:
-                if choice in ["a", "A"]:
-                    self.add_card()
-                if choice in ["r", "R"]:
-                    self.remove_card()
-                elif choice in ["l", "l"]:
-                    self.learn()
-                elif choice in ["f", "F"]:
-                    self.find()
-                elif choice in ["t", "T"]:
-                    self.stats()
-                elif choice in ["s", "S"]:
-                    self.save()
+                self.parse_execute_command(command)
             except (KeyboardInterrupt, EOFError):
                 pass
 
         print()
-        if self.db.changes and ask_yes_no("Save changes?", exact=False, default=True):
+        if self.db.changes and ask_yes_no("Save changes?",
+                                          exact=False, default=True):
+            self.save()
+
+    def parse_execute_command(self, command: str) -> None:
+        if command in ["a", "A"]:
+            self.add_card()
+        if command in ["r", "R"]:
+            self.remove_card()
+        elif command in ["l", "l"]:
+            self.learn()
+        elif command in ["f", "F"]:
+            self.find()
+        elif command in ["t", "T"]:
+            self.stats()
+        elif command in ["s", "S"]:
             self.save()
 
     def add_card(self) -> None:
         try:
-            entries = [] # type: List[Entry]
+            entries = []  # type: List[Entry]
             for lang in self.db.langs:
                 text = input(lang + ": ")
                 if text == '"""':
@@ -75,7 +84,6 @@ class VocabularyApp:
         except (KeyboardInterrupt, EOFError):
             print()
             return
-
 
     def remove_card(self) -> None:
         content = input("Enter card to remove: ")
@@ -107,18 +115,21 @@ class VocabularyApp:
             if not self.db.top().is_due():
                 return
 
+            card = self.db.top()
+            i += 1
+            entry = card.due_entry()
+
+            # print due side first, all sides after press of enter
+            print(chr(27) + "[2J")
+            print(entry, end=" ")
+            input()
+            print(chr(27) + "[2J")
+            card.print()
+
+            correct = ask_yes_no("Correct?")
+
             try:
                 card = self.db.pop()
-                i += 1
-                entry = card.due_entry()
-
-                print(chr(27) + "[2J")
-                print(entry, end=" ")
-                input()
-                print(chr(27) + "[2J")
-                card.print()
-
-                correct = ask_yes_no("Correct?")
                 self.db.retention[1] += entry.proficiency
                 if correct:
                     self.db.retention[0] += entry.proficiency
@@ -151,12 +162,6 @@ class VocabularyApp:
 
         print("Retention score:", 100 * self.db.retention[0]/self.db.retention[1])
 
-        #cards = self.db.cards.copy()
-        #n = 0
-        #while cards and heapq.heappop(cards).is_due():
-        #    n += 1
-        #print("Cards due:", n)
-
     def save(self) -> None:
         if not self.db.changes:
             print("No changes to be saved")
@@ -172,7 +177,8 @@ class VocabularyApp:
                     self.path = input("Save as: ")
 
                 if self.db.rethist and self.db.rethist[-1][0] + 60*60 < time.time():
-                    self.db.rethist += [[time.time(), self.db.retention[0]/self.db.retention[1]]]
+                    self.db.rethist.append([time.time(),
+                                            self.db.retention[0]/self.db.retention[1]])
 
                 self.db.save(self.path)
                 break
