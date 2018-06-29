@@ -8,7 +8,8 @@ import heapq
 from typing import List
 
 
-version = [2, 1, 0]
+# current version [major, minor, patch, others]
+version = [2, 2, 0, "develop"]
 
 
 class Entry:
@@ -65,6 +66,11 @@ class Card:
 
 class Database:
     def __init__(self, langs: List[str]) -> None:
+        """Creates a new database.
+
+        Keyword arguments:
+        langs -- titles of the card sides.
+        """
         self.langs = langs
         self.cards = []  # type: List[Card]
         self.changes = True
@@ -72,17 +78,22 @@ class Database:
         self.retention = [1., 1.]
         self.rethist = []  # type: List[List[float]]
 
+        # maximum number of cards active a every time
+        self.maxcards = 32
+
     def load(filename: str):
         with open(filename, "r", encoding="utf-8") as dbfile:
             return Database.from_dict(json.load(dbfile))
 
     def save(self, filename: str):
         with open(filename, "w", encoding="utf-8") as dbfile:
-            json.dump(self, dbfile, cls=DatabaseEncoder, indent=2, ensure_ascii=False)
+            json.dump(self, dbfile, cls=DatabaseEncoder, indent=2,
+                      ensure_ascii=False)
 
     def from_dict(dct):
         global version
-        if "version" in dct and dct["version"] > version[:2]:
+        # check for potential version incompatabilities
+        if "version" in dct and dct["version"][:2] > version[:2]:
             print("Warning: The loaded file was created with a newer version "
                   "({} > {}). Saving might lead to data loss."
                   .format(".".join(map(str, dct["version"])),
@@ -91,7 +102,13 @@ class Database:
         db = Database(dct["langs"])
         db.changes = False
         db.retention = dct["retention"]
-        if "rethist" in dct: db.rethist = dct["rethist"]
+
+        if "rethist" in dct:
+            db.rethist = dct["rethist"]
+
+        if "maxcards" in dct:
+            db.maxcards = dct["maxcards"]
+
         for c in dct["cards"]:
             card = Card([Entry(e["text"], e["proficiency"], e["due"])
                          for e in c["entries"]],
@@ -101,8 +118,8 @@ class Database:
             db.cards.append(card)
         heapq.heapify(db.cards)
 
-        if len(db.cards) > 40:
-            cards = heapq.nsmallest(40, db.cards)
+        if len(db.cards) > db.maxcards:
+            cards = heapq.nsmallest(db.maxcards, db.cards)
             if cards[-1].is_due():
                 off = time.time() - cards[-1].due_at()
                 for card in db.cards:
@@ -128,9 +145,10 @@ class DatabaseEncoder(json.JSONEncoder):
         global version
         return {
             "langs": db.langs,
-            "version": version[:2],
+            "version": version,
             "retention": db.retention,
             "rethist": db.rethist,
+            "maxcards": db.maxcards,
             "cards": sorted([{
                 "entries": [{
                     "text": entry.text,
@@ -142,5 +160,3 @@ class DatabaseEncoder(json.JSONEncoder):
             } for card in db.cards],
                             key=lambda x: x['added'])
         }
-
-
