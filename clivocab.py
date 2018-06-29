@@ -9,15 +9,15 @@ from typing import Optional
 
 
 class VocabularyApp:
-    def __init__(self) -> None:
-        if len(sys.argv) != 2:
-            print("Usage: {} <file>".format(sys.argv[0]))
+    def run(self) -> None:
+        if len(sys.argv) < 2:
+            print("Usage: {} <file> [command]".format(sys.argv[0]))
+            print("")
+            print("[command] is one of the following:")
+            usage()
             return
 
-        global path
         self.path = sys.argv[1]
-
-    def run(self) -> None:
         self.db = None  # type: Optional[Database]
         # Load database from file, or create new one if file does not exist
         try:
@@ -28,6 +28,14 @@ class VocabularyApp:
             for i in range(n):
                 langs.append(input("Name of entry {}: ".format(i)))
             self.db = Database(langs)
+
+        if len(sys.argv) >= 3:
+            # execute command line arguments
+            command = ' '.join(sys.argv[2:])
+            self.parse_execute_command(command)
+            if self.db.changes:
+                self.save()
+            return
 
         # check if any cards are ready
         if self.db.cards:
@@ -77,6 +85,8 @@ class VocabularyApp:
             self.stats()
         elif command in ["save", "s"]:
             self.save(operands)
+        elif command in ["version", "v"]:
+            print('.'.join(map(str, version)))
         elif command in ["help", "h", "?"]:
             usage(operands)
         else:
@@ -180,7 +190,7 @@ class VocabularyApp:
 
         print("Retention score:", 100 * self.db.retention[0]/self.db.retention[1])
 
-    def save(self, filename: str) -> None:
+    def save(self, filename: str = "") -> None:
         if not filename and not self.db.changes:
             print("No changes to be saved")
             return
@@ -223,8 +233,10 @@ def usage(command: str = "") -> None:
     elif command in ["stats", "t"]:
         print("(stats|t) Get database statistics.")
     elif command in ["save", "s"]:
-        print("(save|s) [file]       Save database.")
+        print("(save|s) [file] Save database.")
         print("[file] file the database should be saved to.")
+    elif command in ["version", "v"]:
+        print("(version|v) Show version information.")
     elif command in ["help", "h", "?"]:
         self.usage(operands)
     else:
@@ -234,6 +246,7 @@ def usage(command: str = "") -> None:
         print("(find|f) [expr]       Search for cards.")
         print("(stats|t)             Get database statistics.")
         print("(save|s) [file]       Save database.")
+        print("(version|v)           Show version information.")
         print("(help|h|?) [command]  Get usage information.")
         print()
         print("For further information on a command, use help [command].")
