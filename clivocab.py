@@ -56,18 +56,31 @@ class VocabularyApp:
             self.save()
 
     def parse_execute_command(self, command: str) -> None:
-        if command in ["a", "A"]:
+        tokens = command.lstrip().split(' ', 1)
+        command = tokens[0]
+        operands = tokens[1] if len(tokens) == 2 else ""
+
+        if command in ["add", "a"]:
             self.add_card()
-        if command in ["r", "R"]:
-            self.remove_card()
-        elif command in ["l", "l"]:
-            self.learn()
-        elif command in ["f", "F"]:
-            self.find()
-        elif command in ["t", "T"]:
+        elif command in ["remove", "r"]:
+            self.remove_card(operands)
+        elif command in ["learn", "l"]:
+            duration = 0.
+            try:
+                duration = float(operands)
+            except ValueError:
+                pass
+            self.learn(duration)
+        elif command in ["find", "f"]:
+            self.find(operands)
+        elif command in ["stats", "t"]:
             self.stats()
-        elif command in ["s", "S"]:
-            self.save()
+        elif command in ["save", "s"]:
+            self.save(operands)
+        elif command in ["help", "h", "?"]:
+            usage(operands)
+        else:
+            print("Unrecognized command: {}. Type ? for help.".format(command))
 
     def add_card(self) -> None:
         try:
@@ -85,8 +98,10 @@ class VocabularyApp:
             print()
             return
 
-    def remove_card(self) -> None:
-        content = input("Enter card to remove: ")
+    def remove_card(self, content: str) -> None:
+        if not content:
+            content = input("Enter card to remove: ")
+
         for card in self.db.cards:
             if content in [e.text for e in card.entries]:
                 print("Removed {}".format(card))
@@ -95,18 +110,18 @@ class VocabularyApp:
                 self.db.changes = True
                 break
 
-    def learn(self) -> None:
+    def learn(self, duration: float = 0) -> None:
         if not self.db.cards or not self.db.top().is_due():
             print("No cards to learn")
             return
 
-        duration = 0.
-        while True:
-            try:
-                duration = float(input("Duration (min): "))
-                break
-            except ValueError:
-                pass
+        if duration <= 0:
+            while True:
+                try:
+                    duration = float(input("Duration (min): "))
+                    break
+                except ValueError:
+                    pass
 
         end_time = time.time() + duration * 60
         i = 0
@@ -145,10 +160,13 @@ class VocabularyApp:
                 break
         print(i)
 
-    def find(self) -> None:
+    def find(self, regex: str) -> None:
+        if not regex:
+            regex = input("Seach for: ")
+
         prog = None
         try:
-            prog = re.compile(".*" + input("Seach for: "))
+            prog = re.compile(".*" + regex)
         except re.error as e:
             print("Error while compiling regular expression:", e.msg)
             return
@@ -162,14 +180,16 @@ class VocabularyApp:
 
         print("Retention score:", 100 * self.db.retention[0]/self.db.retention[1])
 
-    def save(self) -> None:
-        if not self.db.changes:
+    def save(self, filename: str) -> None:
+        if not filename and not self.db.changes:
             print("No changes to be saved")
             return
 
         while True:
             try:
-                if self.path:
+                if filename:
+                    self.path = filename
+                elif self.path:
                     new_path = input("Save as [" + self.path + "]: ")
                     if new_path:
                         self.path = new_path
@@ -186,6 +206,37 @@ class VocabularyApp:
                 pass
 
         self.db.changes = False
+
+
+def usage(command: str = "") -> None:
+    if command in ["add", "a"]:
+        print("(add|a) Add new card.")
+    elif command in ["remove", "r"]:
+        print("(remove|r) [entry] Remove card.")
+        print("[entry] content of one side of the card to be deleted.")
+    elif command in ["learn", "l"]:
+        print("(learn|l) [minutes] Start a learning session.")
+        print("[minutes] specifies the duration of the session.")
+    elif command in ["find", "f"]:
+        print("(find|f) [expr] Search for cards.")
+        print("[expr] a regular expression which the card should match.")
+    elif command in ["stats", "t"]:
+        print("(stats|t) Get database statistics.")
+    elif command in ["save", "s"]:
+        print("(save|s) [file]       Save database.")
+        print("[file] file the database should be saved to.")
+    elif command in ["help", "h", "?"]:
+        self.usage(operands)
+    else:
+        print("(add|a)               Add new card.")
+        print("(remove|r) [entry]    Remove card.")
+        print("(learn|l) [minutes]   Start a learning session.")
+        print("(find|f) [expr]       Search for cards.")
+        print("(stats|t)             Get database statistics.")
+        print("(save|s) [file]       Save database.")
+        print("(help|h|?) [command]  Get usage information.")
+        print()
+        print("For further information on a command, use help [command].")
 
 
 def multiline_input() -> str:
