@@ -2,6 +2,7 @@
 
 import random
 import sys
+import os
 import json
 import time
 import heapq
@@ -85,7 +86,13 @@ class Database:
         with open(filename, "r", encoding="utf-8") as dbfile:
             return Database.from_dict(json.load(dbfile))
 
-    def save(self, filename: str):
+    def save(self, filename: str, backup : bool = True):
+        if backup:
+            try:  # back up old file before saving
+                os.replace(filename, filename + "~")
+            except OSError:
+                pass  # don't fail if backup can't be made
+
         with open(filename, "w", encoding="utf-8") as dbfile:
             json.dump(self, dbfile, cls=DatabaseEncoder, indent=2,
                       ensure_ascii=False)

@@ -32,7 +32,10 @@ class VocabularyApp:
         if len(sys.argv) >= 3:
             # execute command line arguments
             command = ' '.join(sys.argv[2:])
-            self.parse_execute_command(command)
+            try:
+                self.parse_execute_command(command)
+            except (KeyboardInterrupt, EOFError):
+                pass
             if self.db.changes:
                 self.save()
             return
