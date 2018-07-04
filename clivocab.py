@@ -4,6 +4,7 @@ from vocabulary import *
 import sys
 import random
 import re
+import readline
 from math import log
 from typing import Optional
 
