@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import random
 import sys
 import os
@@ -82,6 +80,13 @@ class Database:
         # maximum number of cards active a every time
         self.maxcards = 32
 
+        # factors for scaling proficiencies during quzzing
+        # if answered correctly:
+        self.profscale = 1.75
+        self.timescale = 1.
+        # if answered incorrectly
+        self.faildiv = 16
+
     def load(filename: str):
         with open(filename, "r", encoding="utf-8") as dbfile:
             return Database.from_dict(json.load(dbfile))
@@ -110,11 +115,12 @@ class Database:
         db.changes = False
         db.retention = dct["retention"]
 
-        if "rethist" in dct:
-            db.rethist = dct["rethist"]
+        if "rethist" in dct: db.rethist = dct["rethist"]
+        if "maxcards" in dct: db.maxcards = dct["maxcards"]
+        if "profscale" in dct: db.profscale = dct["profscale"]
+        if "timescale" in dct: db.timescale = dct["timescale"]
+        if "faildiv" in dct: db.faildiv = dct["faildiv"]
 
-        if "maxcards" in dct:
-            db.maxcards = dct["maxcards"]
 
         for c in dct["cards"]:
             card = Card([Entry(e["text"], e["proficiency"], e["due"])
@@ -156,6 +162,9 @@ class DatabaseEncoder(json.JSONEncoder):
             "retention": db.retention,
             "rethist": db.rethist,
             "maxcards": db.maxcards,
+            "profscale": db.profscale,
+            "timescale": db.timescale,
+            "faildiv": db.faildiv,
             "cards": sorted([{
                 "entries": [{
                     "text": entry.text,

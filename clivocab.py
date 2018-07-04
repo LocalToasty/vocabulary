@@ -162,10 +162,11 @@ class VocabularyApp:
                 self.db.retention[1] += entry.proficiency
                 if correct:
                     self.db.retention[0] += entry.proficiency
-                    entry.proficiency = 1.75 * entry.proficiency + random.random() * 3600 * log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
+                    entry.proficiency = self.db.profscale * entry.proficiency + \
+                                        self.db.timescale * random.random() * 3600 * log((time.time() - entry.due)/3600 * 0.125 + 1) * 24 / log(24*0.125 + 1)
                     entry.due = time.time() + entry.proficiency
                 else:
-                    entry.proficiency = max(entry.proficiency / 16, 60.)
+                    entry.proficiency = max(entry.proficiency / self.db.faildiv, 60.)
                     self.db.retention[0] += entry.proficiency
                     entry.due = time.time() + 60
                 self.db.add(card)
