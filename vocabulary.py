@@ -8,7 +8,7 @@ from typing import List
 
 
 # current version [major, minor, patch, others]
-version = [2, 2, 0, "develop"]
+version = [2, 3, 0, "develop"]
 
 
 class Entry:
@@ -28,16 +28,22 @@ class Entry:
 
 
 class Card:
-    def __init__(self, entries: List[Entry], comment: str) -> None:
+    def __init__(self, db, entries: List[Entry], comment: str) -> None:
+        self.db = db
         self.entries = entries
         self.comment = comment
         self.added = time.time()
 
     def due_entry(self) -> Entry:
-        return min(self.entries)
+        return min([entry
+                    for i, entry in enumerate(self.entries)
+                    if self.db.enabled[i]])
 
     def due_at(self):
-        return min([entry.due for entry in self.entries])
+        return min([entry.due
+                    for i, entry in enumerate(self.entries)
+                    if self.db.enabled[i]]
+                   + [float('Inf')])
 
     def is_due(self):
         return time.time() >= self.due_at()
@@ -71,6 +77,7 @@ class Database:
         langs -- titles of the card sides.
         """
         self.langs = langs
+        self.enabled = [True for lang in langs]
         self.cards = []  # type: List[Card]
         self.changes = True
 
@@ -78,7 +85,7 @@ class Database:
         self.rethist = []  # type: List[List[float]]
 
         # maximum number of cards active a every time
-        self.maxcards = 32
+        self.maxcards = 48
 
         # factors for scaling proficiencies during quzzing
         # if answered correctly:
@@ -115,6 +122,7 @@ class Database:
         db.changes = False
         db.retention = dct["retention"]
 
+        if "enabled" in dct: db.enabled = dct["enabled"]
         if "rethist" in dct: db.rethist = dct["rethist"]
         if "maxcards" in dct: db.maxcards = dct["maxcards"]
         if "profscale" in dct: db.profscale = dct["profscale"]
@@ -123,7 +131,8 @@ class Database:
 
 
         for c in dct["cards"]:
-            card = Card([Entry(e["text"], e["proficiency"], e["due"])
+            card = Card(db,
+                        [Entry(e["text"], e["proficiency"], e["due"])
                          for e in c["entries"]],
                         c["comment"])
             if "added" in c:
@@ -158,6 +167,7 @@ class DatabaseEncoder(json.JSONEncoder):
         global version
         return {
             "langs": db.langs,
+            "enabled": db.enabled,
             "version": version,
             "retention": db.retention,
             "rethist": db.rethist,

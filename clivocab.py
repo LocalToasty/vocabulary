@@ -73,7 +73,12 @@ class VocabularyApp:
         operands = tokens[1] if len(tokens) == 2 else ""
 
         if command in ["add", "a"]:
-            self.add_card()
+            count = 1
+            try:
+                count = int(operands)
+            except ValueError:
+                pass
+            self.add_card(count)
         elif command in ["remove", "r"]:
             self.remove_card(operands)
         elif command in ["learn", "l"]:
@@ -94,19 +99,20 @@ class VocabularyApp:
         elif command in ["help", "h", "?"]:
             usage(operands)
         else:
-            print("Unrecognized command: {}. Type ? for help.".format(command))
+            print("Unrecognized command '{}': Type ? for help.".format(command))
 
-    def add_card(self) -> None:
+    def add_card(self, count: int = 1) -> None:
         try:
-            entries = []  # type: List[Entry]
-            for lang in self.db.langs:
-                text = input(lang + ": ")
-                if text == '"""':
-                    text = multiline_input()
-                entries.append(Entry(text))
+            for _i in range(count):  # add count cards
+                entries = []  # type: List[Entry]
+                for lang in self.db.langs:
+                    text = input(lang + ": ")
+                    if text == '"""':
+                        text = multiline_input()
+                    entries.append(Entry(text))
 
-            comment = input("Comment: ")
-            self.db.add(Card(entries, comment))
+                comment = input("Comment: ")
+                self.db.add(Card(self.db, entries, comment))
 
         except (KeyboardInterrupt, EOFError):
             print()
@@ -150,7 +156,7 @@ class VocabularyApp:
 
             # print due side first, all sides after press of enter
             print(chr(27) + "[2J")
-            print(entry, end=" ")
+            print(entry)
             input()
             print(chr(27) + "[2J")
             card.print()
@@ -225,7 +231,8 @@ class VocabularyApp:
 
 def usage(command: str = "") -> None:
     if command in ["add", "a"]:
-        print("(add|a) Add new card.")
+        print("(add|a) [count] Add new cards.")
+        print("[count] number of cards to add.")
     elif command in ["remove", "r"]:
         print("(remove|r) [entry] Remove card.")
         print("[entry] content of one side of the card to be deleted.")
@@ -245,7 +252,7 @@ def usage(command: str = "") -> None:
     elif command in ["help", "h", "?"]:
         self.usage(operands)
     else:
-        print("(add|a)               Add new card.")
+        print("(add|a) [count]       Add new card.")
         print("(remove|r) [entry]    Remove card.")
         print("(learn|l) [minutes]   Start a learning session.")
         print("(find|f) [expr]       Search for cards.")
